@@ -154,11 +154,13 @@ elif page == "Milking & Feeding":
     df_morning = load_csv(MILK_DIS_M_CSV_URL, drop_cols=["Timestamp"])
     df_evening = load_csv(MILK_DIS_E_CSV_URL, drop_cols=["Timestamp"])
 
+    # --- Date setup ---
     start_date = pd.Timestamp("2025-11-01")
-    this_month = pd.Timestamp.now().month
-    this_year = pd.Timestamp.now().year
+    now = pd.Timestamp.now()
+    this_month = now.month
+    this_year = now.year
 
-    # --- Clean and filter ---
+    # --- Clean and filter helper ---
     def clean_and_filter(df):
         if df.empty or "Date" not in df.columns:
             return df
@@ -178,21 +180,22 @@ elif page == "Milking & Feeding":
             milk_col = c
             break
 
+    # --- Ensure numeric ---
     if not df.empty and milk_col:
         df[milk_col] = pd.to_numeric(df[milk_col], errors="coerce")
 
-    # --- Totals ---
-    total_milk_produced = df[milk_col].sum() if milk_col else 0
+    # --- Total milk produced ---
+    total_milk_produced = df[milk_col].sum() if not df.empty and milk_col else 0
 
     # --- Total milk this month ---
     total_milk_month = 0
     if not df.empty and milk_col:
-        df_date = pd.to_datetime(df["Date"], format="%d-%m-%Y", errors="coerce")
+        df["Date_dt"] = pd.to_datetime(df["Date"], format="%d-%m-%Y", errors="coerce")
         df_this_month = df[
-            (df_date.dt.month == this_month) & (df_date.dt.year == this_year)
+            (df["Date_dt"].dt.month == this_month) & (df["Date_dt"].dt.year == this_year)
         ]
         if not df_this_month.empty:
-            total_milk_month = pd.to_numeric(df_this_month[milk_col], errors="coerce").sum()
+            total_milk_month = df_this_month[milk_col].sum()
 
     # --- Cow-wise total ---
     cow_wise = pd.DataFrame()
@@ -224,7 +227,6 @@ elif page == "Milking & Feeding":
     col2.metric("📅 Milk Produced This Month", f"{total_milk_month:.2f} L")
     col3.metric("🚚 Total Milk Delivered", f"{total_distributed:.2f} L")
 
-
     # --- Cow-wise production ---
     st.divider()
     st.subheader("🐮 Cow-wise Milk Production (From 1 Nov 2025)")
@@ -238,19 +240,19 @@ elif page == "Milking & Feeding":
     st.subheader("📅 Daily Milk Production Trend")
     if not df.empty and milk_col:
         df_daily = df.copy()
-        df_daily["Date"] = pd.to_datetime(df_daily["Date"], format="%d-%m-%Y", errors="coerce")
+        df_daily["Date_dt"] = pd.to_datetime(df_daily["Date"], format="%d-%m-%Y", errors="coerce")
         daily_summary = (
-            df_daily.groupby("Date")[milk_col].sum().reset_index().sort_values("Date")
+            df_daily.groupby("Date_dt")[milk_col].sum().reset_index().sort_values("Date_dt")
         )
-        st.line_chart(daily_summary.set_index("Date"))
+        st.line_chart(daily_summary.set_index("Date_dt"))
     else:
         st.info("No daily milking data to display.")
 
     # --- Raw data ---
     st.divider()
-    st.subheader("📋 Raw Milking & Feeding Data")
+    st.subheader("📋 Raw Milking & Feeding Data (From 1 Nov 2025)")
     if not df.empty:
-        df_display = df.sort_values("Date", ascending=False)
+        df_display = df.sort_values(by="Date", ascending=False)
         st.dataframe(df_display, use_container_width=True)
     else:
         st.info("No milking & feeding data available after 1 Nov 2025.")
