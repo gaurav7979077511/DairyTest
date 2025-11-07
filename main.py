@@ -137,7 +137,7 @@ elif page == "Milking & Feeding":
     this_month = pd.Timestamp.now().month
     this_year = pd.Timestamp.now().year
 
-    # --- Clean and filter function ---
+    # --- Clean and filter ---
     def clean_and_filter(df):
         if df.empty or "Date" not in df.columns:
             return df
@@ -150,34 +150,41 @@ elif page == "Milking & Feeding":
     df_morning = clean_and_filter(df_morning)
     df_evening = clean_and_filter(df_evening)
 
-    # --- Convert numeric milk column ---
-    if not df.empty and "Milking -दूध" in df.columns:
-        df["Milking -दूध"] = pd.to_numeric(df["Milking -दूध"], errors="coerce")
+    # --- Detect milk column dynamically ---
+    milk_col = None
+    for c in df.columns:
+        if "milk" in c.lower() or "दूध" in c:
+            milk_col = c
+            break
 
-    # --- Total Milk Produced ---
-    total_milk_produced = df["Milking -दूध"].sum() if "Milking -दूध" in df.columns else 0
+    if not df.empty and milk_col:
+        df[milk_col] = pd.to_numeric(df[milk_col], errors="coerce")
 
-    # --- Total Milk Produced This Month ---
+    # --- Totals ---
+    total_milk_produced = df[milk_col].sum() if milk_col else 0
+
+    # --- Total milk this month ---
     total_milk_month = 0
-    if not df.empty:
+    if not df.empty and milk_col:
         df_date = pd.to_datetime(df["Date"], format="%d-%m-%Y", errors="coerce")
         df_this_month = df[
             (df_date.dt.month == this_month) & (df_date.dt.year == this_year)
         ]
-        total_milk_month = pd.to_numeric(df_this_month["Milking -दूध"], errors="coerce").sum()
+        if not df_this_month.empty:
+            total_milk_month = pd.to_numeric(df_this_month[milk_col], errors="coerce").sum()
 
-    # --- Cow-wise Total Milk Produced ---
+    # --- Cow-wise total ---
     cow_wise = pd.DataFrame()
-    if not df.empty and "CowID" in df.columns:
+    if not df.empty and "CowID" in df.columns and milk_col:
         cow_wise = (
-            df.groupby("CowID")["Milking -दूध"]
+            df.groupby("CowID")[milk_col]
             .sum()
             .reset_index()
-            .rename(columns={"Milking -दूध": "Total Milk (L)"})
+            .rename(columns={milk_col: "Total Milk (L)"})
             .sort_values("Total Milk (L)", ascending=False)
         )
 
-    # --- Total Milk Distributed (for comparison) ---
+    # --- Total Milk Distributed ---
     def total_milk_distributed(df):
         if df.empty:
             return 0
@@ -189,7 +196,7 @@ elif page == "Milking & Feeding":
     total_distributed_evening = total_milk_distributed(df_evening)
     total_distributed = total_distributed_morning + total_distributed_evening
 
-    # --- KPI Metrics ---
+    # --- KPIs ---
     st.subheader("📊 Key Metrics (From 1 Nov 2025)")
     col1, col2, col3 = st.columns(3)
     col1.metric("🥛 Total Milk Produced", f"{total_milk_produced:.2f} L")
@@ -199,14 +206,13 @@ elif page == "Milking & Feeding":
     # --- Comparison chart ---
     st.divider()
     st.subheader("📈 Produced vs Distributed Comparison")
-
     df_compare = pd.DataFrame({
         "Metric": ["Total Produced", "Total Distributed"],
         "Litres": [total_milk_produced, total_distributed],
     })
     st.bar_chart(df_compare.set_index("Metric"))
 
-    # --- Cow-wise Production ---
+    # --- Cow-wise production ---
     st.divider()
     st.subheader("🐮 Cow-wise Milk Production (From 1 Nov 2025)")
     if not cow_wise.empty:
@@ -214,21 +220,20 @@ elif page == "Milking & Feeding":
     else:
         st.info("No cow-wise milking data available yet.")
 
-    # --- Daily Total Milk Trend ---
+    # --- Daily trend ---
     st.divider()
     st.subheader("📅 Daily Milk Production Trend")
-
-    if not df.empty:
+    if not df.empty and milk_col:
         df_daily = df.copy()
         df_daily["Date"] = pd.to_datetime(df_daily["Date"], format="%d-%m-%Y", errors="coerce")
         daily_summary = (
-            df_daily.groupby("Date")["Milking -दूध"].sum().reset_index().sort_values("Date")
+            df_daily.groupby("Date")[milk_col].sum().reset_index().sort_values("Date")
         )
         st.line_chart(daily_summary.set_index("Date"))
     else:
         st.info("No daily milking data to display.")
 
-    # --- Raw Data (at the end) ---
+    # --- Raw data ---
     st.divider()
     st.subheader("📋 Raw Milking & Feeding Data")
     if not df.empty:
