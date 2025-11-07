@@ -61,136 +61,87 @@ page = st.sidebar.radio(
 # ----------------------------
 # DASHBOARD
 # ----------------------------
-if page == "🏠 Dashboard":
-    st.title("🐄 Dairy Farm Dashboard (from 1 Nov 2025)")
-    st.caption("Smart summary of farm performance, cash flow, and milk operations.")
+# ------------------------------
+# DASHBOARD ENHANCEMENT
+# ------------------------------
+st.header("📊 Dairy Dashboard Summary")
 
-    # ----------------------------
-    # Load Data
-    # ----------------------------
-    df_expense = load_csv(EXPENSE_CSV_URL, drop_cols=["Timestamp"])
-    df_invest = load_csv(INVESTMENT_CSV_URL, drop_cols=["Timestamp"])
-    df_payment = load_csv(PAYMENT_CSV_URL, drop_cols=["Timestamp"])
-    df_milk_m = load_csv(MILK_DIS_M_CSV_URL, drop_cols=["Timestamp"])
-    df_milk_e = load_csv(MILK_DIS_E_CSV_URL, drop_cols=["Timestamp"])
-    df_cow_log = load_csv(COW_LOG_CSV_URL, drop_cols=["Timestamp"])
+START_DATE = pd.Timestamp("2025-11-01")
 
-    # ----------------------------
-    # Filter from 1 Nov 2025
-    # ----------------------------
-    start_date = pd.Timestamp("2025-11-01")
+# Filter all data from 1st Nov 2025 onward
+for df in [df_cow_log, df_expense, df_milk_m, df_milk_e, df_payment_received, df_investment]:
+    if "Date" in df.columns:
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        df = df[df["Date"] >= START_DATE]
 
-    def clean_filter(df):
-        if "Date" in df.columns:
-            df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-            df = df[df["Date"] >= start_date]
-            df["Date"] = df["Date"].dt.strftime("%d-%m-%Y")
-        return df
+# ------------------------------
+# LIFETIME SUMMARY (from 1 Nov 2025)
+# ------------------------------
+st.subheader("📅 Lifetime Summary (From 1 Nov 2025)")
 
-    for d in [df_expense, df_invest, df_payment, df_milk_m, df_milk_e, df_cow_log]:
-        clean_filter(d)
+# Total milk produced
+milk_col = next((c for c in df_cow_log.columns if "milk" in c.lower() or "दूध" in c), None)
+total_milk_produced = pd.to_numeric(df_cow_log[milk_col], errors="coerce").sum() if milk_col else 0
 
-    # ----------------------------
-    # Totals
-    # ----------------------------
-    total_expense = df_expense["Amount"].sum() if "Amount" in df_expense.columns else 0
-    total_invest = df_invest["Amount"].sum() if "Amount" in df_invest.columns else 0
-    total_payment = df_payment["Amount"].sum() if "Amount" in df_payment.columns else 0
+# Total distributed
+def sum_numeric_columns(df, exclude_cols=None):
+    if df.empty:
+        return 0
+    exclude_cols = exclude_cols or []
+    return df.drop(columns=[c for c in exclude_cols if c in df.columns], errors="ignore").select_dtypes(include="number").sum().sum()
 
-    total_milk_m = sum_numeric_columns(df_milk_m, exclude_cols=["Timestamp", "Date"])
-    total_milk_e = sum_numeric_columns(df_milk_e, exclude_cols=["Timestamp", "Date"])
-    total_milk = total_milk_m + total_milk_e
+total_milk_m = sum_numeric_columns(df_milk_m, exclude_cols=["Timestamp", "Date"])
+total_milk_e = sum_numeric_columns(df_milk_e, exclude_cols=["Timestamp", "Date"])
+total_milk_distributed = total_milk_m + total_milk_e
+remaining_milk = total_milk_produced - total_milk_distributed
 
-    # ----------------------------
-    # Milk Production Summary (From Milking & Feeding)
-    # ----------------------------
-    milk_col = None
-    if not df_cow_log.empty:
-        for c in df_cow_log.columns:
-            if "milk" in c.lower() or "दूध" in c:
-                milk_col = c
-                break
-    total_milk_produced = df_cow_log[milk_col].sum() if milk_col and milk_col in df_cow_log.columns else 0
+# Total expense
+total_expense = pd.to_numeric(df_expense["Amount"], errors="coerce").sum() if not df_expense.empty else 0
 
-    # ----------------------------
-    # Fund at Bipin Kumar
-    # ----------------------------
-    bipin_invest = df_invest[df_invest["Paid To"].str.contains("Bipin Kumar", case=False, na=False)] if "Paid To" in df_invest.columns else pd.DataFrame()
-    bipin_payment = df_payment[df_payment["Received By"].str.contains("Bipin Kumar", case=False, na=False)] if "Received By" in df_payment.columns else pd.DataFrame()
-    bipin_expense = df_expense[df_expense["Expense By"].str.contains("Bipin Kumar", case=False, na=False)] if "Expense By" in df_expense.columns else pd.DataFrame()
+# Fund (Bipin Kumar)
+investment_bipin = df_investment.loc[df_investment["Paid To"] == "Bipin Kumar", "Amount"].sum() if "Paid To" in df_investment.columns else 0
+received_bipin = df_payment_received.loc[df_payment_received["Received By"] == "Bipin Kumar", "Amount"].sum() if "Received By" in df_payment_received.columns else 0
+expense_bipin = df_expense.loc[df_expense["Expense By"] == "Bipin Kumar", "Amount"].sum() if "Expense By" in df_expense.columns else 0
+fund_bipin = investment_bipin + received_bipin - expense_bipin
 
-    total_invest_bipin = bipin_invest["Amount"].sum() if "Amount" in bipin_invest.columns else 0
-    total_payment_bipin = bipin_payment["Amount"].sum() if "Amount" in bipin_payment.columns else 0
-    total_expense_bipin = bipin_expense["Amount"].sum() if "Amount" in bipin_expense.columns else 0
-    fund_bipin = total_invest_bipin + total_payment_bipin - total_expense_bipin
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("🥛 Total Milk Produced", f"{total_milk_produced:.2f} L")
+col2.metric("🚚 Total Milk Distributed", f"{total_milk_distributed:.2f} L")
+col3.metric("❗ Remaining / Lost Milk", f"{remaining_milk:.2f} L")
+col4.metric("💰 Total Expense", f"₹{total_expense:,.2f}")
 
-    # ----------------------------
-    # Layout Section 1: Financial Overview
-    # ----------------------------
-    st.markdown("### 💰 Financial Overview")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("💸 Total Expenses", f"₹{total_expense:,.2f}")
-    col2.metric("📈 Total Investment", f"₹{total_invest:,.2f}")
-    col3.metric("💵 Total Payments", f"₹{total_payment:,.2f}")
-    col4.metric("💼 Fund at Bipin Kumar", f"₹{fund_bipin:,.2f}")
+col5, _ = st.columns(2)
+col5.metric("🏦 Fund Available (Bipin Kumar)", f"₹{fund_bipin:,.2f}")
 
-    # ----------------------------
-    # Layout Section 2: Milk Summary
-    # ----------------------------
-    st.markdown("---")
-    st.markdown("### 🥛 Milk Summary")
+# ------------------------------
+# CURRENT MONTH SUMMARY
+# ------------------------------
+current_month = pd.Timestamp.today().strftime("%B %Y")
+st.subheader(f"📅 Current Month Summary ({current_month})")
 
-    col5, col6, col7 = st.columns(3)
-    col5.metric("🌅 Morning Milk", f"{total_milk_m:.2f} L")
-    col6.metric("🌇 Evening Milk", f"{total_milk_e:.2f} L")
-    col7.metric("🥛 Total Milk Distributed", f"{total_milk:.2f} L")
+# Get current month filter
+today = pd.Timestamp.today()
+df_month_expense = df_expense[df_expense["Date"].dt.month == today.month]
+df_month_milk_m = df_milk_m[df_milk_m["Date"].dt.month == today.month]
+df_month_milk_e = df_milk_e[df_milk_e["Date"].dt.month == today.month]
+df_month_cow_log = df_cow_log[df_cow_log["Date"].dt.month == today.month]
 
-    col8, col9 = st.columns(2)
-    col8.metric("🐄 Total Milk Produced", f"{total_milk_produced:.2f} L")
-    remaining_milk = total_milk_produced - total_milk
-    col9.metric("📉 Remaining / Lost Milk", f"{remaining_milk:.2f} L")
+# Current month metrics
+milk_col = next((c for c in df_month_cow_log.columns if "milk" in c.lower() or "दूध" in c), None)
+milk_month = pd.to_numeric(df_month_cow_log[milk_col], errors="coerce").sum() if milk_col else 0
 
-    # ----------------------------
-    # Visualization: Milk Comparison
-    # ----------------------------
-    st.markdown("#### 📊 Milk Production vs Distribution")
-    milk_data = pd.DataFrame({
-        "Category": ["Produced", "Distributed", "Remaining"],
-        "Litres": [total_milk_produced, total_milk, remaining_milk]
-    })
-    st.bar_chart(milk_data.set_index("Category"))
+milk_m_month = sum_numeric_columns(df_month_milk_m, exclude_cols=["Timestamp", "Date"])
+milk_e_month = sum_numeric_columns(df_month_milk_e, exclude_cols=["Timestamp", "Date"])
+milk_distributed_month = milk_m_month + milk_e_month
+remaining_milk_month = milk_month - milk_distributed_month
 
-    # ----------------------------
-    # Layout Section 3: Expense Trends
-    # ----------------------------
-    st.markdown("---")
-    st.markdown("### 📅 Expense Trend (From 1 Nov 2025)")
+expense_month = pd.to_numeric(df_month_expense["Amount"], errors="coerce").sum() if not df_month_expense.empty else 0
 
-    if not df_expense.empty and "Date" in df_expense.columns and "Amount" in df_expense.columns:
-        df_expense["Date"] = pd.to_datetime(df_expense["Date"], errors="coerce")
-        expense_trend = df_expense.groupby("Date")["Amount"].sum().reset_index().sort_values("Date")
-        st.line_chart(expense_trend.set_index("Date"))
-    else:
-        st.info("No expense data to show yet.")
-
-    # ----------------------------
-    # Layout Section 4: Recent Data
-    # ----------------------------
-    st.markdown("---")
-    st.markdown("### 🧾 Recent Entries")
-    col10, col11 = st.columns(2)
-    if not df_expense.empty:
-        col10.markdown("**Recent Expenses**")
-        col10.dataframe(df_expense.sort_values("Date", ascending=False).head(5), use_container_width=True)
-    if not df_payment.empty:
-        col11.markdown("**Recent Payments**")
-        col11.dataframe(df_payment.sort_values("Date", ascending=False).head(5), use_container_width=True)
-
-    # ----------------------------
-    # Footer
-    # ----------------------------
-    st.markdown("---")
-    st.caption("📅 Data considered from **1 November 2025 onwards** for all sections.")
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("🥛 Milk Produced (This Month)", f"{milk_month:.2f} L")
+col2.metric("🚚 Milk Distributed (This Month)", f"{milk_distributed_month:.2f} L")
+col3.metric("❗ Remaining / Lost Milk (This Month)", f"{remaining_milk_month:.2f} L")
+col4.metric("💰 Expense (This Month)", f"₹{expense_month:,.2f}")
 
 # ----------------------------
 # MILKING & FEEDING PAGE
