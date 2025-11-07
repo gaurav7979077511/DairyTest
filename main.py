@@ -200,8 +200,57 @@ elif page == "Milk Distribution":
 # ----------------------------
 elif page == "Expense":
     st.title("💸 Expense Tracker")
+
     df_expense = load_csv(EXPENSE_CSV_URL, drop_cols=["Timestamp"])
-    st.dataframe(df_expense, use_container_width=True if not df_expense.empty else False)
+
+    if not df_expense.empty:
+        # --- Convert Date column properly ---
+        if "Date" in df_expense.columns:
+            df_expense["Date"] = pd.to_datetime(df_expense["Date"], errors="coerce")
+            df_expense = df_expense.sort_values("Date", ascending=False)
+
+        # --- Total Expense ---
+        total_expense = df_expense["Amount"].sum()
+
+        # --- Current Month Expense ---
+        current_month = pd.Timestamp.now().month
+        current_year = pd.Timestamp.now().year
+        df_this_month = df_expense[
+            (df_expense["Date"].dt.month == current_month)
+            & (df_expense["Date"].dt.year == current_year)
+        ]
+        monthly_expense = df_this_month["Amount"].sum()
+
+        # --- KPIs ---
+        col1, col2 = st.columns(2)
+        col1.metric("💰 Total Expense", f"₹{total_expense:,.2f}")
+        col2.metric("📅 This Month's Expense", f"₹{monthly_expense:,.2f}")
+
+        st.divider()
+
+        # --- Expense by Type ---
+        if "Expense Type" in df_expense.columns:
+            expense_by_type = (
+                df_expense.groupby("Expense Type")["Amount"].sum().sort_values(ascending=False)
+            )
+            st.subheader("📊 Expense by Type")
+            st.bar_chart(expense_by_type)
+
+        # --- Expense by Person ---
+        if "Expense By" in df_expense.columns:
+            expense_by_person = (
+                df_expense.groupby("Expense By")["Amount"].sum().sort_values(ascending=False)
+            )
+            st.subheader("👤 Expense by Person")
+            st.bar_chart(expense_by_person)
+
+        st.divider()
+        st.subheader("🧾 Detailed Expense Records")
+        st.dataframe(df_expense, use_container_width=True)
+
+    else:
+        st.info("No expense records found.")
+
 
 elif page == "Payments":
     st.title("💰 Payments Record")
