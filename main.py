@@ -203,14 +203,6 @@ elif page == "Milking & Feeding":
     col2.metric("📅 Milk Produced This Month", f"{total_milk_month:.2f} L")
     col3.metric("🚚 Total Milk Delivered", f"{total_distributed:.2f} L")
 
-    # --- Comparison chart ---
-    st.divider()
-    st.subheader("📈 Produced vs Distributed Comparison")
-    df_compare = pd.DataFrame({
-        "Metric": ["Total Produced", "Total Distributed"],
-        "Litres": [total_milk_produced, total_distributed],
-    })
-    st.bar_chart(df_compare.set_index("Metric"))
 
     # --- Cow-wise production ---
     st.divider()
