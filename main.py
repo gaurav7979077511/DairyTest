@@ -58,9 +58,9 @@ page = st.sidebar.radio(
     "Go to",
     ["🏠 Dashboard", "Milking & Feeding", "Milk Distribution", "Expense", "Payments", "Investments"]
 )
-import plotly.express as px
 
-elif page == "Dashboard":
+
+if page == "Dashboard":
     # ------------------------------
     # CUSTOM CSS (Dark + Light Mode)
     # ------------------------------
