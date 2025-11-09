@@ -359,15 +359,15 @@ elif page == "Milking & Feeding":
 
     st.divider()
 
-        # -------------------- Raw Data --------------------
-        st.subheader("🗃 Raw Data")
+    # -------------------- Raw Data --------------------
+    st.subheader("🗃 Raw Data")
     
-        st.markdown("#### Milking & Feeding Log")
-        if not df.empty and "Date" in df.columns:
-            df_sorted = df.sort_values(by="Date", ascending=False)
-            st.dataframe(df_sorted, use_container_width=True)
-        else:
-            st.info("No milking or feeding data available.")
+    st.markdown("#### Milking & Feeding Log")
+    if not df.empty and "Date" in df.columns:
+        df_sorted = df.sort_values(by="Date", ascending=False)
+        st.dataframe(df_sorted, use_container_width=True)
+    else:
+        st.info("No milking or feeding data available.")
 
 
 # ============================================================
