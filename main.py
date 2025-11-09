@@ -310,28 +310,7 @@ elif page == "Milking & Feeding":
     # -------------------- Total Milk Produced --------------------
     total_milk_produced = df[milk_col].sum() if not df.empty and milk_col else 0
 
-    # -------------------- Total Milk This Month --------------------
-    total_milk_month = 0
-    if not df.empty and milk_col:
-        df["Date_dt"] = pd.to_datetime(df["Date"], format="%d-%m-%Y", errors="coerce")
-        df_this_month = df[
-            (df["Date_dt"].dt.month == this_month) & (df["Date_dt"].dt.year == this_year)
-        ]
-        if not df_this_month.empty:
-            total_milk_month = df_this_month[milk_col].sum()
-
-    # -------------------- Cow-wise Production --------------------
-    cow_wise = pd.DataFrame()
-    if not df.empty and "CowID" in df.columns and milk_col:
-        cow_wise = (
-            df.groupby("CowID")[milk_col]
-            .sum()
-            .reset_index()
-            .rename(columns={milk_col: "Total Milk (L)"})
-            .sort_values("Total Milk (L)", ascending=False)
-        )
-
-    # -------------------- Milk Distributed --------------------
+    # -------------------- Total Milk Distributed --------------------
     def total_milk_distributed(df):
         if df.empty:
             return 0
@@ -343,30 +322,55 @@ elif page == "Milking & Feeding":
     total_distributed_evening = total_milk_distributed(df_evening)
     total_distributed = total_distributed_morning + total_distributed_evening
 
-    # -------------------- KPI --------------------
-    st.subheader("📊 Key Metrics (From 1 Nov 2025)")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("🥛 Total Milk Produced", f"{total_milk_produced:.2f} L")
-    col2.metric("📅 Milk Produced This Month", f"{total_milk_month:.2f} L")
-    col3.metric("🚚 Total Milk Delivered", f"{total_distributed:.2f} L")
-
-    st.divider()
-    st.subheader("🐮 Cow-wise Milk Production (From 1 Nov 2025)")
-    if not cow_wise.empty:
-        st.dataframe(cow_wise, use_container_width=True)
-    else:
-        st.info("No cow-wise milking data available yet.")
-
-    st.divider()
-    st.subheader("📅 Daily Milk Production Trend")
+    # -------------------- Milk Produced This Month --------------------
+    total_milk_month = 0
+    total_distributed_month = 0
     if not df.empty and milk_col:
-        df_daily = df.copy()
-        df_daily["Date_dt"] = pd.to_datetime(df_daily["Date"], format="%d-%m-%Y", errors="coerce")
-        df_trend = df_daily.groupby("Date_dt")[milk_col].sum().reset_index()
-        df_trend = df_trend.sort_values("Date_dt")
-        st.line_chart(df_trend.set_index("Date_dt"), use_container_width=True)
-    else:
-        st.warning("No milk data available to plot trend.")
+        df["Date_dt"] = pd.to_datetime(df["Date"], format="%d-%m-%Y", errors="coerce")
+        df_this_month = df[
+            (df["Date_dt"].dt.month == this_month) & (df["Date_dt"].dt.year == this_year)
+        ]
+        if not df_this_month.empty:
+            total_milk_month = df_this_month[milk_col].sum()
+
+    if not df_morning.empty or not df_evening.empty:
+        df_morning["Date_dt"] = pd.to_datetime(df_morning["Date"], format="%d-%m-%Y", errors="coerce")
+        df_evening["Date_dt"] = pd.to_datetime(df_evening["Date"], format="%d-%m-%Y", errors="coerce")
+        df_morning_month = df_morning[
+            (df_morning["Date_dt"].dt.month == this_month) & (df_morning["Date_dt"].dt.year == this_year)
+        ]
+        df_evening_month = df_evening[
+            (df_evening["Date_dt"].dt.month == this_month) & (df_evening["Date_dt"].dt.year == this_year)
+        ]
+        total_distributed_month = total_milk_distributed(df_morning_month) + total_milk_distributed(df_evening_month)
+
+    # -------------------- Overall Metrics --------------------
+    st.subheader("📊 Overall Metrics (From 1 Nov 2025)")
+    col1, col2 = st.columns(2)
+    col1.metric("🥛 Total Milk Produced", f"{total_milk_produced:.2f} L")
+    col2.metric("🚚 Total Milk Delivered", f"{total_distributed:.2f} L")
+
+    st.divider()
+
+    # -------------------- Monthly Summary --------------------
+    st.subheader(f"📅 Milk Summary - {now.strftime('%B %Y')}")
+    col3, col4 = st.columns(2)
+    col3.metric("🥛 Milk Produced This Month", f"{total_milk_month:.2f} L")
+    col4.metric("🚚 Milk Delivered This Month", f"{total_distributed_month:.2f} L")
+
+    st.divider()
+
+    # -------------------- Raw Data --------------------
+    st.subheader("🗃 Raw Data")
+    st.markdown("#### Milking & Feeding Log")
+    st.dataframe(df, use_container_width=True)
+
+    st.markdown("#### Morning Distribution")
+    st.dataframe(df_morning, use_container_width=True)
+
+    st.markdown("#### Evening Distribution")
+    st.dataframe(df_evening, use_container_width=True)
+
 
 # ============================================================
 # 🚚 MILK DISTRIBUTION PAGE
