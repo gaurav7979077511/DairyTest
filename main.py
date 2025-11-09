@@ -122,13 +122,30 @@ if page == "🏠 Dashboard":
                 font-size: 1rem;
             }
         }
+        /* Center the radio button group */
+        .radio-center {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+            margin-bottom: 25px;
+        }
+        
+        div[data-testid="stRadio"] > div {
+            justify-content: center !important;
+        }
+        
+        /* Radio button label color */
+        div[data-testid="stRadio"] label {
+            color: var(--text-color) !important;
+        }
+
         </style>
         """,
         unsafe_allow_html=True,
     )
 
 
-    st.header("🌙 Dairy Dashboard (Dark Mode)")
+    st.header("🌙 Dairy Dashboard")
 
     START_DATE = pd.Timestamp("2025-11-01")
 
@@ -150,7 +167,7 @@ if page == "🏠 Dashboard":
     # ------------------------------
     # 📊 Lifetime Summary
     # ------------------------------
-    st.subheader("📊 Lifetime Summary")
+    st.subheader("📊 Overall Summary")
 
     milk_col = next((c for c in df_cow_log.columns if "milk" in c.lower() or "दूध" in c), None)
     total_milk_produced = pd.to_numeric(df_cow_log[milk_col], errors="coerce").sum() if milk_col else 0
@@ -235,11 +252,14 @@ if page == "🏠 Dashboard":
     # ------------------------------
     st.subheader("📈 Milk Production vs Delivery Trend")
 
+    st.markdown('<div class="radio-center">', unsafe_allow_html=True)
     period = st.radio(
-        "Select Period:",
+        "Select Duration:",
         ["1 Week", "1 Month", "3 Months", "6 Months", "1 Year", "All"],
-        horizontal=True
+        horizontal=True,
     )
+    st.markdown('</div>', unsafe_allow_html=True)
+
 
     date_limit = {
         "1 Week": today - pd.Timedelta(weeks=1),
