@@ -276,7 +276,7 @@ if page == "🏠 Dashboard":
 # 🐄 MILKING & FEEDING PAGE
 # ============================================================
 elif page == "Milking & Feeding":
-    st.title("🐄 Milking & Feeding Analysis")
+    st.title("🐄 Milking & Feeding Data")
 
     # -------------------- Load Data --------------------
     df = load_csv(COW_LOG_CSV_URL, drop_cols=["Timestamp"])
@@ -290,17 +290,17 @@ elif page == "Milking & Feeding":
     this_year = now.year
 
     # -------------------- Helper Function --------------------
-    def clean_and_filter(df):
+    def clean_dates(df):
         if df.empty or "Date" not in df.columns:
             return df
-        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce", dayfirst=True)
+        df.dropna(subset=["Date"], inplace=True)
         df = df[df["Date"] >= start_date]
-        df["Date"] = df["Date"].dt.strftime("%d-%m-%Y")
         return df
 
-    df = clean_and_filter(df)
-    df_morning = clean_and_filter(df_morning)
-    df_evening = clean_and_filter(df_evening)
+    df = clean_dates(df)
+    df_morning = clean_dates(df_morning)
+    df_evening = clean_dates(df_evening)
 
     # -------------------- Detect Milk Column --------------------
     milk_col = next((c for c in df.columns if "milk" in c.lower() or "दूध" in c), None)
@@ -310,39 +310,38 @@ elif page == "Milking & Feeding":
     # -------------------- Total Milk Produced --------------------
     total_milk_produced = df[milk_col].sum() if not df.empty and milk_col else 0
 
-    # -------------------- Combine Morning + Evening Delivery --------------------
-    def combine_distribution(df1, df2):
-        if df1.empty and df2.empty:
-            return pd.DataFrame(columns=["Date", "Delivered"])
-        df_all = pd.concat([df1, df2], ignore_index=True)
-        df_all["Date"] = pd.to_datetime(df_all["Date"], errors="coerce")
-        df_all = df_all.dropna(subset=["Date"])
-        numeric_cols = df_all.select_dtypes(include="number")
-        df_all["Delivered"] = numeric_cols.sum(axis=1)
-        combined = df_all.groupby("Date")["Delivered"].sum().reset_index()
-        combined["Date"] = combined["Date"].dt.strftime("%d-%m-%Y")
-        return combined
+    # -------------------- Total Milk Delivered --------------------
+    def total_milk_distributed(df):
+        if df.empty:
+            return 0
+        numeric_cols = df.select_dtypes(include=["number"])
+        return numeric_cols.sum().sum()
 
-    df_delivery = combine_distribution(df_morning, df_evening)
-    total_distributed = df_delivery["Delivered"].sum() if not df_delivery.empty else 0
+    total_distributed_morning = total_milk_distributed(df_morning)
+    total_distributed_evening = total_milk_distributed(df_evening)
+    total_distributed = total_distributed_morning + total_distributed_evening
 
-    # -------------------- This Month’s Data --------------------
+    # -------------------- This Month’s Milk --------------------
     total_milk_month = 0
     total_distributed_month = 0
 
     if not df.empty and milk_col:
-        df["Date_dt"] = pd.to_datetime(df["Date"], format="%d-%m-%Y", errors="coerce")
         df_this_month = df[
-            (df["Date_dt"].dt.month == this_month) & (df["Date_dt"].dt.year == this_year)
+            (df["Date"].dt.month == this_month) & (df["Date"].dt.year == this_year)
         ]
         total_milk_month = df_this_month[milk_col].sum() if not df_this_month.empty else 0
 
-    if not df_delivery.empty:
-        df_delivery["Date_dt"] = pd.to_datetime(df_delivery["Date"], format="%d-%m-%Y", errors="coerce")
-        df_deliv_month = df_delivery[
-            (df_delivery["Date_dt"].dt.month == this_month) & (df_delivery["Date_dt"].dt.year == this_year)
+    if not df_morning.empty:
+        df_morning_month = df_morning[
+            (df_morning["Date"].dt.month == this_month) & (df_morning["Date"].dt.year == this_year)
         ]
-        total_distributed_month = df_deliv_month["Delivered"].sum() if not df_deliv_month.empty else 0
+        total_distributed_month += total_milk_distributed(df_morning_month)
+
+    if not df_evening.empty:
+        df_evening_month = df_evening[
+            (df_evening["Date"].dt.month == this_month) & (df_evening["Date"].dt.year == this_year)
+        ]
+        total_distributed_month += total_milk_distributed(df_evening_month)
 
     # -------------------- Overall Metrics --------------------
     st.subheader("📊 Overall Metrics (From 1 Nov 2025)")
@@ -360,13 +359,15 @@ elif page == "Milking & Feeding":
 
     st.divider()
 
-    # -------------------- Raw Data --------------------
-    st.subheader("🗃 Raw Data")
-    st.markdown("#### Milking & Feeding Log")
-    st.dataframe(df, use_container_width=True)
-
-    st.markdown("#### Combined Milk Delivery Data")
-    st.dataframe(df_delivery, use_container_width=True)
+        # -------------------- Raw Data --------------------
+        st.subheader("🗃 Raw Data")
+    
+        st.markdown("#### Milking & Feeding Log")
+        if not df.empty and "Date" in df.columns:
+            df_sorted = df.sort_values(by="Date", ascending=False)
+            st.dataframe(df_sorted, use_container_width=True)
+        else:
+            st.info("No milking or feeding data available.")
 
 
 # ============================================================
