@@ -310,39 +310,39 @@ elif page == "Milking & Feeding":
     # -------------------- Total Milk Produced --------------------
     total_milk_produced = df[milk_col].sum() if not df.empty and milk_col else 0
 
-    # -------------------- Total Milk Distributed --------------------
-    def total_milk_distributed(df):
-        if df.empty:
-            return 0
-        numeric_cols = [c for c in df.columns if c not in ["Timestamp", "Date"]]
-        df_numeric = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
-        return df_numeric.sum().sum()
+    # -------------------- Combine Morning + Evening Delivery --------------------
+    def combine_distribution(df1, df2):
+        if df1.empty and df2.empty:
+            return pd.DataFrame(columns=["Date", "Delivered"])
+        df_all = pd.concat([df1, df2], ignore_index=True)
+        df_all["Date"] = pd.to_datetime(df_all["Date"], errors="coerce")
+        df_all = df_all.dropna(subset=["Date"])
+        numeric_cols = df_all.select_dtypes(include="number")
+        df_all["Delivered"] = numeric_cols.sum(axis=1)
+        combined = df_all.groupby("Date")["Delivered"].sum().reset_index()
+        combined["Date"] = combined["Date"].dt.strftime("%d-%m-%Y")
+        return combined
 
-    total_distributed_morning = total_milk_distributed(df_morning)
-    total_distributed_evening = total_milk_distributed(df_evening)
-    total_distributed = total_distributed_morning + total_distributed_evening
+    df_delivery = combine_distribution(df_morning, df_evening)
+    total_distributed = df_delivery["Delivered"].sum() if not df_delivery.empty else 0
 
-    # -------------------- Milk Produced This Month --------------------
+    # -------------------- This Month’s Data --------------------
     total_milk_month = 0
     total_distributed_month = 0
+
     if not df.empty and milk_col:
         df["Date_dt"] = pd.to_datetime(df["Date"], format="%d-%m-%Y", errors="coerce")
         df_this_month = df[
             (df["Date_dt"].dt.month == this_month) & (df["Date_dt"].dt.year == this_year)
         ]
-        if not df_this_month.empty:
-            total_milk_month = df_this_month[milk_col].sum()
+        total_milk_month = df_this_month[milk_col].sum() if not df_this_month.empty else 0
 
-    if not df_morning.empty or not df_evening.empty:
-        df_morning["Date_dt"] = pd.to_datetime(df_morning["Date"], format="%d-%m-%Y", errors="coerce")
-        df_evening["Date_dt"] = pd.to_datetime(df_evening["Date"], format="%d-%m-%Y", errors="coerce")
-        df_morning_month = df_morning[
-            (df_morning["Date_dt"].dt.month == this_month) & (df_morning["Date_dt"].dt.year == this_year)
+    if not df_delivery.empty:
+        df_delivery["Date_dt"] = pd.to_datetime(df_delivery["Date"], format="%d-%m-%Y", errors="coerce")
+        df_deliv_month = df_delivery[
+            (df_delivery["Date_dt"].dt.month == this_month) & (df_delivery["Date_dt"].dt.year == this_year)
         ]
-        df_evening_month = df_evening[
-            (df_evening["Date_dt"].dt.month == this_month) & (df_evening["Date_dt"].dt.year == this_year)
-        ]
-        total_distributed_month = total_milk_distributed(df_morning_month) + total_milk_distributed(df_evening_month)
+        total_distributed_month = df_deliv_month["Delivered"].sum() if not df_deliv_month.empty else 0
 
     # -------------------- Overall Metrics --------------------
     st.subheader("📊 Overall Metrics (From 1 Nov 2025)")
@@ -365,11 +365,8 @@ elif page == "Milking & Feeding":
     st.markdown("#### Milking & Feeding Log")
     st.dataframe(df, use_container_width=True)
 
-    st.markdown("#### Morning Distribution")
-    st.dataframe(df_morning, use_container_width=True)
-
-    st.markdown("#### Evening Distribution")
-    st.dataframe(df_evening, use_container_width=True)
+    st.markdown("#### Combined Milk Delivery Data")
+    st.dataframe(df_delivery, use_container_width=True)
 
 
 # ============================================================
