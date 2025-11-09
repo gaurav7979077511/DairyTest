@@ -229,7 +229,7 @@ if page == "🏠 Dashboard":
             "",
             ["1 Week", "1 Month", "3 Months", "6 Months", "1 Year", "3 Years", "5 Years", "Max"],
             horizontal=True,
-            index=2,  # Default to "3 Months"
+            index=1,  # Default to "3 Months"
         )
     
     # --- Determine date range based on selection
