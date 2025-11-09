@@ -219,48 +219,58 @@ if page == "🏠 Dashboard":
     st.markdown("<hr/>", unsafe_allow_html=True)
 
     # -------------------- Milk Production vs Delivery Graph --------------------
+    # -------------------- Milk Production vs Delivery Graph --------------------
     st.subheader("📈 Milk Production vs Delivery Trend")
-    st.markdown('<div class="radio-center">', unsafe_allow_html=True)
-    period = st.radio(
-        "Select Duration:",
-        ["1 Week", "1 Month", "3 Months", "6 Months", "1 Year", "All"],
-        horizontal=True,
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
-
+    
+    # --- Centered Radio Button for Date Range
+    col1, col2, col3 = st.columns([1, 3, 1])  # Center alignment
+    with col2:
+        range_option = st.radio(
+            "",
+            ["1 Week", "1 Month", "3 Months", "6 Months", "1 Year", "3 Years", "5 Years", "Max"],
+            horizontal=True,
+            index=2,  # Default to "3 Months"
+        )
+    
+    # --- Determine date range based on selection
+    today = pd.Timestamp.today()
     date_limit = {
         "1 Week": today - pd.Timedelta(weeks=1),
         "1 Month": today - pd.DateOffset(months=1),
         "3 Months": today - pd.DateOffset(months=3),
         "6 Months": today - pd.DateOffset(months=6),
         "1 Year": today - pd.DateOffset(years=1),
-        "All": START_DATE,
-    }[period]
-
-    # --- Grouping for chart
+        "3 Years": today - pd.DateOffset(years=3),
+        "5 Years": today - pd.DateOffset(years=5),
+        "Max": START_DATE,
+    }[range_option]
+    
+    # --- Prepare production data
     if not df_cow_log.empty and milk_col:
         df_cow_log["Date"] = pd.to_datetime(df_cow_log["Date"], errors="coerce")
         df_cow_log = df_cow_log[df_cow_log["Date"] >= date_limit]
         daily_prod = df_cow_log.groupby("Date")[milk_col].sum().reset_index()
     else:
         daily_prod = pd.DataFrame(columns=["Date", "Produced"])
-
+    
     # --- Combine morning & evening distribution
     def combine_distribution(df1, df2):
         df_all = pd.concat([df1, df2])
         df_all["Date"] = pd.to_datetime(df_all["Date"], errors="coerce")
         df_all["Total"] = df_all.select_dtypes(include="number").sum(axis=1)
         return df_all.groupby("Date")["Total"].sum().reset_index()
-
+    
     df_delivery = combine_distribution(df_milk_m, df_milk_e)
     df_delivery = df_delivery[df_delivery["Date"] >= date_limit]
-
+    
+    # --- Display line chart
     if not daily_prod.empty and not df_delivery.empty:
         chart_df = pd.merge(daily_prod, df_delivery, on="Date", how="outer").fillna(0)
         chart_df = chart_df.rename(columns={milk_col: "Produced", "Total": "Delivered"})
         st.line_chart(chart_df.set_index("Date"))
     else:
         st.info("No sufficient data for chart.")
+
 
 # ============================================================
 # 🐄 MILKING & FEEDING PAGE
