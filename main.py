@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
 
 # ----------------------------
@@ -59,7 +60,7 @@ page = st.sidebar.radio(
     ["🏠 Dashboard", "Milking & Feeding", "Milk Distribution", "Expense", "Payments", "Investments"]
 )
 
-import plotly.express as px
+
 if page == "Dashboard":
     # ------------------------------
     # CUSTOM CSS (Dark + Light Mode)
