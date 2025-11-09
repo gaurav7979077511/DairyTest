@@ -310,16 +310,10 @@ elif page == "Milking & Feeding":
     # -------------------- Total Milk Produced --------------------
     total_milk_produced = df[milk_col].sum() if not df.empty and milk_col else 0
 
-    # -------------------- Total Milk Delivered --------------------
-    def total_milk_distributed(df):
-        if df.empty:
-            return 0
-        numeric_cols = df.select_dtypes(include=["number"])
-        return numeric_cols.sum().sum()
-
-    total_distributed_morning = total_milk_distributed(df_morning)
-    total_distributed_evening = total_milk_distributed(df_evening)
-    total_distributed = total_distributed_morning + total_distributed_evening
+    # -------------------- Total Milk Delivered (same logic as Dashboard) --------------------
+    total_milk_m = sum_numeric_columns(df_morning, exclude_cols=["Timestamp", "Date"])
+    total_milk_e = sum_numeric_columns(df_evening, exclude_cols=["Timestamp", "Date"])
+    total_distributed = total_milk_m + total_milk_e
 
     # -------------------- This Month’s Milk --------------------
     total_milk_month = 0
@@ -331,17 +325,17 @@ elif page == "Milking & Feeding":
         ]
         total_milk_month = df_this_month[milk_col].sum() if not df_this_month.empty else 0
 
-    if not df_morning.empty:
-        df_morning_month = df_morning[
-            (df_morning["Date"].dt.month == this_month) & (df_morning["Date"].dt.year == this_year)
-        ]
-        total_distributed_month += total_milk_distributed(df_morning_month)
+    # Same month filtering logic as Dashboard
+    def filter_month(df):
+        if df.empty or "Date" not in df.columns:
+            return df
+        return df[(df["Date"].dt.month == this_month) & (df["Date"].dt.year == this_year)]
 
-    if not df_evening.empty:
-        df_evening_month = df_evening[
-            (df_evening["Date"].dt.month == this_month) & (df_evening["Date"].dt.year == this_year)
-        ]
-        total_distributed_month += total_milk_distributed(df_evening_month)
+    df_morning_month = filter_month(df_morning)
+    df_evening_month = filter_month(df_evening)
+    milk_m_month = sum_numeric_columns(df_morning_month, exclude_cols=["Timestamp", "Date"])
+    milk_e_month = sum_numeric_columns(df_evening_month, exclude_cols=["Timestamp", "Date"])
+    total_distributed_month = milk_m_month + milk_e_month
 
     # -------------------- Overall Metrics --------------------
     st.subheader("📊 Overall Metrics (From 1 Nov 2025)")
@@ -361,7 +355,7 @@ elif page == "Milking & Feeding":
 
     # -------------------- Raw Data --------------------
     st.subheader("🗃 Raw Data")
-    
+
     st.markdown("#### Milking & Feeding Log")
     if not df.empty and "Date" in df.columns:
         df_sorted = df.sort_values(by="Date", ascending=False)
