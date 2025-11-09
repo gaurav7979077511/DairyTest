@@ -119,7 +119,7 @@ if page == "🏠 Dashboard":
         unsafe_allow_html=True,
     )
 
-    st.header("🌙 Dairy Dashboard")
+    st.header("🐄 Dairy Farm Dashboard")
 
     # -------------------- Load Data --------------------
     START_DATE = pd.Timestamp("2025-11-01")
