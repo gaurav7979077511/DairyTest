@@ -64,36 +64,69 @@ if page == "🏠 Dashboard":
     st.markdown(
         """
         <style>
-        /* Dark background and text */
-        .main {
-            background-color: #0e1117;
-            color: #f0f2f6;
+        /* ====== THEME AUTO-DETECTION ====== */
+        :root {
+            --bg-color: #0e1117;
+            --card-bg: #1a1d23;
+            --text-color: #f0f2f6;
+            --accent: #00FFFF;
+            --border-color: #00FFFF44;
+            --shadow-color: #00FFFF22;
         }
-        /* Card-style metrics */
+    
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg-color: #f9f9f9;
+                --card-bg: #ffffff;
+                --text-color: #000000;
+                --accent: #0077ff;
+                --border-color: #0077ff33;
+                --shadow-color: #0077ff11;
+            }
+        }
+    
+        /* ====== APPLY VARIABLES ====== */
+        .main {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+    
         div[data-testid="stMetric"] {
-            background-color: #1a1d23;
-            border: 1px solid #00FFFF44;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
             border-radius: 15px;
             padding: 15px;
-            box-shadow: 0 0 8px #00FFFF22;
+            box-shadow: 0 0 8px var(--shadow-color);
             text-align: center;
         }
-        /* Headers */
+    
         h1, h2, h3 {
-            color: #00FFFF;
+            color: var(--accent);
         }
-        /* Divider style */
+    
         hr {
-            border: 1px solid #00FFFF33;
+            border: 1px solid var(--border-color);
         }
-        /* Radio buttons and labels */
+    
         label, .stRadio {
-            color: #f0f2f6 !important;
+            color: var(--text-color) !important;
+        }
+    
+        /* Make responsive for mobile */
+        @media (max-width: 768px) {
+            div[data-testid="stMetric"] {
+                padding: 10px;
+                font-size: 0.85rem;
+            }
+            h1, h2, h3 {
+                font-size: 1rem;
+            }
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
 
     st.header("🌙 Dairy Dashboard (Dark Mode)")
 
