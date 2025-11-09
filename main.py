@@ -271,164 +271,309 @@ if page == "🏠 Dashboard":
     else:
         st.info("No sufficient data for chart.")
 
-
-# ============================================================
-# 🐄 MILKING & FEEDING PAGE
-# ============================================================
+# ----------------------------
+# MILKING & FEEDING PAGE
+# ----------------------------
 elif page == "Milking & Feeding":
-    st.title("🐄 Milking & Feeding Data")
+    st.title("🐄 Milking & Feeding Analysis")
 
-    # -------------------- Load Data --------------------
+    # --- Load data ---
     df = load_csv(COW_LOG_CSV_URL, drop_cols=["Timestamp"])
     df_morning = load_csv(MILK_DIS_M_CSV_URL, drop_cols=["Timestamp"])
     df_evening = load_csv(MILK_DIS_E_CSV_URL, drop_cols=["Timestamp"])
 
-    # -------------------- Date setup --------------------
+    # --- Date setup ---
     start_date = pd.Timestamp("2025-11-01")
     now = pd.Timestamp.now()
     this_month = now.month
     this_year = now.year
 
-    # -------------------- Helper Function --------------------
-    def clean_dates(df):
+    # --- Clean and filter helper ---
+    def clean_and_filter(df):
         if df.empty or "Date" not in df.columns:
             return df
-        df["Date"] = pd.to_datetime(df["Date"], errors="coerce", dayfirst=True)
-        df.dropna(subset=["Date"], inplace=True)
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
         df = df[df["Date"] >= start_date]
+        df["Date"] = df["Date"].dt.strftime("%d-%m-%Y")
         return df
 
-    df = clean_dates(df)
-    df_morning = clean_dates(df_morning)
-    df_evening = clean_dates(df_evening)
+    df = clean_and_filter(df)
+    df_morning = clean_and_filter(df_morning)
+    df_evening = clean_and_filter(df_evening)
 
-    # -------------------- Detect Milk Column --------------------
-    milk_col = next((c for c in df.columns if "milk" in c.lower() or "दूध" in c), None)
+    # --- Detect milk column dynamically ---
+    milk_col = None
+    for c in df.columns:
+        if "milk" in c.lower() or "दूध" in c:
+            milk_col = c
+            break
+
+    # --- Ensure numeric ---
     if not df.empty and milk_col:
         df[milk_col] = pd.to_numeric(df[milk_col], errors="coerce")
 
-    # -------------------- Total Milk Produced --------------------
+    # --- Total milk produced ---
     total_milk_produced = df[milk_col].sum() if not df.empty and milk_col else 0
 
-    # -------------------- Total Milk Delivered (same logic as Dashboard) --------------------
-    total_milk_m = sum_numeric_columns(df_morning, exclude_cols=["Timestamp", "Date"])
-    total_milk_e = sum_numeric_columns(df_evening, exclude_cols=["Timestamp", "Date"])
-    total_distributed = total_milk_m + total_milk_e
-
-    # -------------------- This Month’s Milk --------------------
+    # --- Total milk this month ---
     total_milk_month = 0
-    total_distributed_month = 0
-
     if not df.empty and milk_col:
+        df["Date_dt"] = pd.to_datetime(df["Date"], format="%d-%m-%Y", errors="coerce")
+        df_this_month = df[
+            (df["Date_dt"].dt.month == this_month) & (df["Date_dt"].dt.year == this_year)
+        ]
+        if not df_this_month.empty:
+            total_milk_month = df_this_month[milk_col].sum()
+
+    # --- Cow-wise total ---
+    cow_wise = pd.DataFrame()
+    if not df.empty and "CowID" in df.columns and milk_col:
+        cow_wise = (
+            df.groupby("CowID")[milk_col]
+            .sum()
+            .reset_index()
+            .rename(columns={milk_col: "Total Milk (L)"})
+            .sort_values("Total Milk (L)", ascending=False)
+        )
+
+    # --- Total Milk Distributed ---
+    def total_milk_distributed(df):
+        if df.empty:
+            return 0
+        numeric_cols = [c for c in df.columns if c not in ["Timestamp", "Date"]]
+        df_numeric = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
+        return df_numeric.sum().sum()
+
+    total_distributed_morning = total_milk_distributed(df_morning)
+    total_distributed_evening = total_milk_distributed(df_evening)
+    total_distributed = total_distributed_morning + total_distributed_evening
+
+    # --- KPIs ---
+    st.subheader("📊 Key Metrics (From 1 Nov 2025)")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("🥛 Total Milk Produced", f"{total_milk_produced:.2f} L")
+    col2.metric("📅 Milk Produced This Month", f"{total_milk_month:.2f} L")
+    col3.metric("🚚 Total Milk Delivered", f"{total_distributed:.2f} L")
+
+    # --- Cow-wise production ---
+    st.divider()
+    st.subheader("🐮 Cow-wise Milk Production (From 1 Nov 2025)")
+    if not cow_wise.empty:
+        st.dataframe(cow_wise, use_container_width=True)
+    else:
+        st.info("No cow-wise milking data available yet.")
+
+    # --- Daily trend ---
+    st.divider()
+    st.subheader("📅 Daily Milk Production Trend")
+    if not df.empty and milk_col:
+        df_daily = df.copy()
+        df_daily["Date_dt"] = pd.to_datetime(df_daily["Date"], format="%d-%m-%Y", errors="coerce")
+        daily_summary = (
+            df_daily.groupby("Date_dt")[milk_col].sum().reset_index().sort_values("Date_dt")
+        )
+        st.line_chart(daily_summary.set_index("Date_dt"))
+    else:
+        st.info("No daily milking data to display.")
+
+    # --- Raw data ---
+    st.divider()
+    st.subheader("📋 Raw Milking & Feeding Data (From 1 Nov 2025)")
+    if not df.empty:
+        df_display = df.sort_values(by="Date", ascending=False)
+        st.dataframe(df_display, use_container_width=True)
+    else:
+        st.info("No milking & feeding data available after 1 Nov 2025.")
+
+
+# ----------------------------
+# MILK DISTRIBUTION PAGE
+# ----------------------------
+elif page == "Milk Distribution":
+    st.title("🥛 Milk Distribution")
+
+    # --- Load data ---
+    df_morning = load_csv(MILK_DIS_M_CSV_URL, drop_cols=["Timestamp"])
+    df_evening = load_csv(MILK_DIS_E_CSV_URL, drop_cols=["Timestamp"])
+    df_cow_log = load_csv(COW_LOG_CSV_URL, drop_cols=["Timestamp"])
+
+    # --- Date filtering: only include records from 1 Nov 2025 onward ---
+    start_date = pd.Timestamp("2025-11-01")
+
+    def clean_and_filter(df):
+        if df.empty or "Date" not in df.columns:
+            return df
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        df = df[df["Date"] >= start_date]  # Filter only from 1 Nov 2025
+        df["Date"] = df["Date"].dt.strftime("%d-%m-%Y")  # Format date
+        return df
+
+    df_morning = clean_and_filter(df_morning)
+    df_evening = clean_and_filter(df_evening)
+
+    # --- Total milk distributed (sum numeric columns except date) ---
+    def total_milk_distributed(df):
+        if df.empty:
+            return 0
+        numeric_cols = [c for c in df.columns if c not in ["Timestamp", "Date"]]
+        df_numeric = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
+        return df_numeric.sum().sum()
+
+    total_morning = total_milk_distributed(df_morning)
+    total_evening = total_milk_distributed(df_evening)
+    total_distributed = total_morning + total_evening
+
+    # --- Monthly totals ---
+    this_month = pd.Timestamp.now().month
+    this_year = pd.Timestamp.now().year
+
+    def monthly_distribution(df):
+        if df.empty or "Date" not in df.columns:
+            return 0
+        df["Date"] = pd.to_datetime(df["Date"], format="%d-%m-%Y", errors="coerce")
         df_this_month = df[
             (df["Date"].dt.month == this_month) & (df["Date"].dt.year == this_year)
         ]
-        total_milk_month = df_this_month[milk_col].sum() if not df_this_month.empty else 0
+        return total_milk_distributed(df_this_month)
 
-    # Same month filtering logic as Dashboard
-    def filter_month(df):
-        if df.empty or "Date" not in df.columns:
-            return df
-        return df[(df["Date"].dt.month == this_month) & (df["Date"].dt.year == this_year)]
+    monthly_morning = monthly_distribution(df_morning)
+    monthly_evening = monthly_distribution(df_evening)
+    monthly_distributed = monthly_morning + monthly_evening
 
-    df_morning_month = filter_month(df_morning)
-    df_evening_month = filter_month(df_evening)
-    milk_m_month = sum_numeric_columns(df_morning_month, exclude_cols=["Timestamp", "Date"])
-    milk_e_month = sum_numeric_columns(df_evening_month, exclude_cols=["Timestamp", "Date"])
-    total_distributed_month = milk_m_month + milk_e_month
+    # --- Total milk produced this month from cow log (filter from 1 Nov 2025) ---
+    total_milk_produced_month = 0
+    if not df_cow_log.empty:
+        df_cow_log.columns = [c.strip().lower() for c in df_cow_log.columns]
+        if "date" in df_cow_log.columns and "milking -दूध" in df_cow_log.columns:
+            df_cow_log["date"] = pd.to_datetime(df_cow_log["date"], errors="coerce")
+            df_cow_log = df_cow_log[df_cow_log["date"] >= start_date]  # Filter Nov 1 onward
+            df_cow_log["month"] = df_cow_log["date"].dt.month
+            df_cow_log["year"] = df_cow_log["date"].dt.year
+            df_month = df_cow_log[
+                (df_cow_log["month"] == this_month) & (df_cow_log["year"] == this_year)
+            ]
+            total_milk_produced_month = pd.to_numeric(
+                df_month["milking -दूध"], errors="coerce"
+            ).sum()
 
-    # -------------------- Overall Metrics --------------------
-    st.subheader("📊 Overall Metrics (From 1 Nov 2025)")
-    col1, col2 = st.columns(2)
-    col1.metric("🥛 Total Milk Produced", f"{total_milk_produced:.2f} L")
-    col2.metric("🚚 Total Milk Delivered", f"{total_distributed:.2f} L")
+    remaining_milk = total_milk_produced_month - monthly_distributed
+
+    # --- KPI Metrics ---
+    col1, col2, col3 = st.columns(3)
+    col1.metric("🥛 Total Milk Distributed (from 1 Nov 2025)", f"{total_distributed:.2f} L")
+    col2.metric("📅 This Month's Distribution", f"{monthly_distributed:.2f} L")
+    col3.metric("🧾 Remaining Milk (This Month)", f"{remaining_milk:.2f} L")
 
     st.divider()
 
-    # -------------------- Monthly Summary --------------------
-    st.subheader(f"📅 Milk Summary - {now.strftime('%B %Y')}")
-    col3, col4 = st.columns(2)
-    col3.metric("🥛 Milk Produced This Month", f"{total_milk_month:.2f} L")
-    col4.metric("🚚 Milk Delivered This Month", f"{total_distributed_month:.2f} L")
-
-    st.divider()
-
-    # -------------------- Raw Data --------------------
-    st.subheader("🗃 Raw Data")
-
-    st.markdown("#### Milking & Feeding Log")
-    if not df.empty and "Date" in df.columns:
-        df_sorted = df.sort_values(by="Date", ascending=False)
-        st.dataframe(df_sorted, use_container_width=True)
-    else:
-        st.info("No milking or feeding data available.")
-
-
-# ============================================================
-# 🚚 MILK DISTRIBUTION PAGE
-# ============================================================
-elif page == "Milk Distribution":
-    st.title("🚚 Milk Distribution Summary")
-    df_morning = load_csv(MILK_DIS_M_CSV_URL)
-    df_evening = load_csv(MILK_DIS_E_CSV_URL)
-
+    # --- Morning Distribution Table ---
     st.subheader("🌅 Morning Distribution")
     if not df_morning.empty:
-        st.dataframe(df_morning, use_container_width=True)
-        st.metric(
-            "Total Morning Milk Distributed",
-            f"{sum_numeric_columns(df_morning, ['Timestamp', 'Date']):.2f} L",
-        )
+        df_morning_display = df_morning.sort_values("Date", ascending=False)
+        st.dataframe(df_morning_display, use_container_width=True)
     else:
-        st.warning("No morning data available")
+        st.info("No morning distribution data available after 1 Nov 2025.")
 
-    st.divider()
-
+    # --- Evening Distribution Table ---
     st.subheader("🌇 Evening Distribution")
     if not df_evening.empty:
-        st.dataframe(df_evening, use_container_width=True)
-        st.metric(
-            "Total Evening Milk Distributed",
-            f"{sum_numeric_columns(df_evening, ['Timestamp', 'Date']):.2f} L",
-        )
+        df_evening_display = df_evening.sort_values("Date", ascending=False)
+        st.dataframe(df_evening_display, use_container_width=True)
     else:
-        st.warning("No evening data available")
+        st.info("No evening distribution data available after 1 Nov 2025.")
 
-# ============================================================
-# 💸 EXPENSE PAGE
-# ============================================================
+    # --- Trend Chart ---
+    st.divider()
+    st.subheader("📈 Daily Milk Distribution Trend (from 1 Nov 2025)")
+
+    if not df_morning.empty or not df_evening.empty:
+        df_morning_chart = df_morning.copy()
+        df_evening_chart = df_evening.copy()
+
+        for df_temp in [df_morning_chart, df_evening_chart]:
+            df_temp["Date"] = pd.to_datetime(df_temp["Date"], format="%d-%m-%Y", errors="coerce")
+            df_temp["Total"] = df_temp.select_dtypes(include=["number"]).sum(axis=1)
+
+        df_chart = pd.concat([
+            df_morning_chart[["Date", "Total"]],
+            df_evening_chart[["Date", "Total"]],
+        ])
+        df_chart = df_chart.groupby("Date")["Total"].sum().reset_index().sort_values("Date")
+
+        st.line_chart(df_chart.set_index("Date"))
+    else:
+        st.info("No distribution data available to plot.")
+
+
+# ----------------------------
+# EXPENSE, PAYMENTS, INVESTMENTS (unchanged)
+# ----------------------------
 elif page == "Expense":
     st.title("💸 Expense Tracker")
-    df_expense = load_csv(EXPENSE_CSV_URL)
-    if df_expense.empty:
-        st.warning("No expense data available.")
-    else:
-        df_expense["Amount"] = pd.to_numeric(df_expense["Amount"], errors="coerce")
+
+    df_expense = load_csv(EXPENSE_CSV_URL, drop_cols=["Timestamp"])
+
+    if not df_expense.empty:
+        # --- Convert Date column properly ---
+        if "Date" in df_expense.columns:
+            df_expense["Date"] = pd.to_datetime(df_expense["Date"], errors="coerce")
+            df_expense = df_expense.sort_values("Date", ascending=False)
+
+        # --- Total Expense ---
+        total_expense = df_expense["Amount"].sum()
+
+        # --- Current Month Expense ---
+        current_month = pd.Timestamp.now().month
+        current_year = pd.Timestamp.now().year
+        df_this_month = df_expense[
+            (df_expense["Date"].dt.month == current_month)
+            & (df_expense["Date"].dt.year == current_year)
+        ]
+        monthly_expense = df_this_month["Amount"].sum()
+
+        # --- KPIs ---
+        col1, col2 = st.columns(2)
+        col1.metric("💰 Total Expense", f"₹{total_expense:,.2f}")
+        col2.metric("📅 This Month's Expense", f"₹{monthly_expense:,.2f}")
+
+        st.divider()
+
+        # --- Expense by Type ---
+        if "Expense Type" in df_expense.columns:
+            expense_by_type = (
+                df_expense.groupby("Expense Type")["Amount"].sum().sort_values(ascending=False)
+            )
+            st.subheader("📊 Expense by Type")
+            st.bar_chart(expense_by_type)
+
+        # --- Expense by Person ---
+        if "Expense By" in df_expense.columns:
+            expense_by_person = (
+                df_expense.groupby("Expense By")["Amount"].sum().sort_values(ascending=False)
+            )
+            st.subheader("👤 Expense by Person")
+            st.bar_chart(expense_by_person)
+
+        st.divider()
+        st.subheader("🧾 Detailed Expense Records")
         st.dataframe(df_expense, use_container_width=True)
-        st.metric("Total Expense", f"₹{df_expense['Amount'].sum():,.2f}")
 
-# ============================================================
-# 💰 PAYMENTS PAGE
-# ============================================================
+    else:
+        st.info("No expense records found.")
+
+
 elif page == "Payments":
-    st.title("💰 Payments Received")
-    df_payment = load_csv(PAYMENT_CSV_URL)
-    if df_payment.empty:
-        st.warning("No payment data available.")
-    else:
-        df_payment["Amount"] = pd.to_numeric(df_payment["Amount"], errors="coerce")
-        st.dataframe(df_payment, use_container_width=True)
-        st.metric("Total Payment Received", f"₹{df_payment['Amount'].sum():,.2f}")
+    st.title("💰 Payments Record")
+    df_payment = load_csv(PAYMENT_CSV_URL, drop_cols=["Timestamp"])
+    st.dataframe(df_payment, use_container_width=True if not df_payment.empty else False)
 
-# ============================================================
-# 💼 INVESTMENTS PAGE
-# ============================================================
 elif page == "Investments":
-    st.title("💼 Investment Summary")
-    df_investment = load_csv(INVESTMENT_CSV_URL)
-    if df_investment.empty:
-        st.warning("No investment data available.")
-    else:
-        df_investment["Amount"] = pd.to_numeric(df_investment["Amount"], errors="coerce")
-        st.dataframe(df_investment, use_container_width=True)
-        st.metric("Total Investment", f"₹{df_investment['Amount'].sum():,.2f}")
+    st.title("📈 Investment Log")
+    df_invest = load_csv(INVESTMENT_CSV_URL, drop_cols=["Timestamp"])
+    st.dataframe(df_invest, use_container_width=True if not df_invest.empty else False)
+
+# ----------------------------
+# REFRESH BUTTON
+# ----------------------------
+if st.sidebar.button("🔁 Refresh"):
+    st.rerun()
