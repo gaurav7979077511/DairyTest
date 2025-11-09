@@ -67,40 +67,52 @@ if page == "Dashboard":
     # ------------------------------
     st.markdown("""
         <style>
+        /* General dark/light mode background */
         [data-testid="stAppViewContainer"] {
             background-color: var(--background-color, #121212);
             color: var(--text-color, #e0e0e0);
         }
+
+        /* Block design */
         .block-container {
             background: rgba(30, 30, 30, 0.95);
             padding: 1.5rem;
             border-radius: 20px;
             box-shadow: 0 0 15px rgba(0,0,0,0.4);
         }
+
+        /* Metric cards */
         div[data-testid="stMetricValue"] {
             color: var(--text-color, #e0e0e0);
             font-weight: 600;
         }
+
+        /* Radio buttons center alignment */
         .radio-center {
             display: flex;
             justify-content: center;
             align-items: center;
             width: 100%;
         }
+
         div[data-testid="stHorizontalBlock"] > div[role="radiogroup"] {
             justify-content: center !important;
             display: flex !important;
             flex-wrap: wrap;
             gap: 0.75rem;
         }
+
         div[data-testid="stRadio"] label {
             color: var(--text-color, #e0e0e0) !important;
             font-weight: 500;
         }
+
         div[data-testid="stRadio"] {
             text-align: center !important;
             width: 100%;
         }
+
+        /* Light mode overrides */
         @media (prefers-color-scheme: light) {
             [data-testid="stAppViewContainer"] {
                 background-color: #f9f9f9 !important;
@@ -212,11 +224,12 @@ if page == "Dashboard":
     col5.metric("🏦 Payment Received (This Month)", f"₹{payment_received_month:,.2f}")
 
     # ------------------------------
-    # INTERACTIVE GRAPH (Plotly)
+    # MILK PRODUCED VS DELIVERED GRAPH
     # ------------------------------
     st.divider()
     st.subheader("📈 Milk Produced vs Delivered Over Time")
 
+    # Period filter (centered)
     st.markdown('<div class="radio-center">', unsafe_allow_html=True)
     period = st.radio(
         "Select Duration:",
@@ -244,11 +257,13 @@ if page == "Dashboard":
         start_date = START_DATE
 
     df_filtered = df_cow_log[df_cow_log["Date"].between(start_date, end_date)]
+    df_filtered["Date"] = pd.to_datetime(df_filtered["Date"])
     milk_daily = (
         df_filtered.groupby("Date")[milk_col].sum().reset_index()
         if milk_col and not df_filtered.empty else pd.DataFrame()
     )
 
+    # Delivered milk daily
     def get_daily_distribution(df):
         if df.empty:
             return pd.DataFrame()
@@ -263,25 +278,9 @@ if page == "Dashboard":
 
     if not milk_daily.empty and not df_delivered.empty:
         df_chart = pd.merge(milk_daily, df_delivered, on="Date", how="outer").fillna(0)
-        fig = px.line(
-            df_chart,
-            x="Date",
-            y=["Milking -दूध", "Delivered"],
-            labels={"value": "Milk (L)", "Date": "Date"},
-            title="Milk Produced vs Delivered",
-            template="plotly_dark",
-            markers=True,
-        )
-        fig.update_layout(
-            hovermode="x unified",
-            legend_title_text="Legend",
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        st.line_chart(df_chart.set_index("Date"))
     else:
         st.info("No data available for the selected period.")
-
 
 
 # ----------------------------
