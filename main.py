@@ -282,7 +282,7 @@ elif page == "Milking & Feeding":
     with col2:
         st.markdown(
             f'<a href="https://forms.gle/4ywNpoYLr7LFQtxe8" target="_blank">'
-            f'<button style="background-color:#4CAF50; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">➕Milking & Feeding</button>'
+            f'<button style="background-color:#81C7F5; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">➕Milking & Feeding</button>'
             f'</a>',
             unsafe_allow_html=True
         )
@@ -486,7 +486,7 @@ elif page == "Milk Distribution":
     with col2:
         st.markdown(
             f'<a href="https://forms.gle/vWfoRDfPtzJiTKZw7" target="_blank">'
-            f'<button style="background-color:#4CAF50; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">➕Morning Distribution</button>'
+            f'<button style="background-color:#FFCA28; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">➕Morning Distribution</button>'
             f'</a>',
             unsafe_allow_html=True
         )
@@ -507,7 +507,7 @@ elif page == "Milk Distribution":
     with col2:
         st.markdown(
             f'<a href="https://forms.gle/5f6Wuh7TNLtC2z9o6" target="_blank">'
-            f'<button style="background-color:#4CAF50; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">➕Evening Distribution</button>'
+            f'<button style="background-color:#FF7043; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">➕Evening Distribution</button>'
             f'</a>',
             unsafe_allow_html=True
         )
@@ -554,7 +554,7 @@ elif page == "Expense":
     with col2:
         st.markdown(
             f'<a href="https://forms.gle/1hCkiBgU8sQKw87S8" target="_blank">'
-            f'<button style="background-color:#4CAF50; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">➕Add Expense</button>'
+            f'<button style="background-color:#C62828; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">➕Add Expense</button>'
             f'</a>',
             unsafe_allow_html=True
         )
@@ -619,7 +619,7 @@ elif page == "Payments":
     with col2:
         st.markdown(
             f'<a href="https://forms.gle/jjaWGAUeTKkkoabX6" target="_blank">'
-            f'<button style="background-color:#4CAF50; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">➕Add Payment</button>'
+            f'<button style="background-color:#9C27B0; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">➕Add Payment</button>'
             f'</a>',
             unsafe_allow_html=True
         )
@@ -636,7 +636,7 @@ elif page == "Investments":
     with col2:
         st.markdown(
             f'<a href="https://forms.gle/usPuRopj64DuxVpJA" target="_blank">'
-            f'<button style="background-color:#4CAF50; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">➕Add Investment</button>'
+            f'<button style="background-color:#2E7D32; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">➕Add Investment</button>'
             f'</a>',
             unsafe_allow_html=True
         )
