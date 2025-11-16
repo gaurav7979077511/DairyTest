@@ -478,10 +478,11 @@ elif page == "Milk Distribution":
 
     st.divider()
 
-    # --- Morning Distribution Table ---
-    st.subheader("🌅 Morning Distribution")
     # Add Morning Distribution Button
     col1, col2 = st.columns([6, 1])
+    with col1:
+        # --- Morning Distribution Table ---
+        st.subheader("🌅 Morning Distribution")
     with col2:
         st.markdown(
             f'<a href="https://forms.gle/vWfoRDfPtzJiTKZw7" target="_blank">'
@@ -497,10 +498,12 @@ elif page == "Milk Distribution":
     else:
         st.info("No morning distribution data available after 1 Nov 2025.")
 
-    # --- Evening Distribution Table ---
-    st.subheader("🌇 Evening Distribution")
+    
     # Add Evening Distribution Button
     col1, col2 = st.columns([6, 1])
+    with col1:
+        # --- Evening Distribution Table ---
+        st.subheader("🌇 Evening Distribution")
     with col2:
         st.markdown(
             f'<a href="https://forms.gle/5f6Wuh7TNLtC2z9o6" target="_blank">'
