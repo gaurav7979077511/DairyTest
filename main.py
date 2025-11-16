@@ -241,9 +241,9 @@ if page == "🏠 Dashboard":
         p2_date, p2_shift, p2_total = date2, shift2, milk2
         d2_date, d2_shift, d2_total = get_latest_delivery("morning")
     
-    # --- Layout: 4 Metric Blocks ---
-    lc1, lc2 = st.columns(2)
-    lc3, lc4 = st.columns(2)
+    # --- Layout: 4 Metric Blocks in ONE ROW ---
+    lc1, lc2, lc3, lc4 = st.columns(4)
+
     
     lc1.metric(f"🥛 Last Milk Produced ({p1_shift})", f"{p1_total} L", p1_date)
     lc2.metric(f"🚚 Last Milk Delivered ({d1_shift})", f"{d1_total} L", d1_date)
