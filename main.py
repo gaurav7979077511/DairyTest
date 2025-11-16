@@ -341,6 +341,87 @@ if page == "🏠 Dashboard":
         st.line_chart(chart_df.set_index("Date"))
     else:
         st.info("No sufficient data for chart.")
+    # -------------------- Missing / Pending Data Detection --------------------
+    st.subheader("📢 Missing / Pending Data (From 1 Nov 2025)")
+    
+    start_date = START_DATE
+    today = pd.Timestamp.today().normalize()
+    now = pd.Timestamp.now()
+    
+    # Create continuous date range
+    all_dates = pd.date_range(start=start_date, end=today)
+    
+    # Extract shift column name
+    shift_col = next((c for c in df_cow_log.columns if "Shift" in c or "पहर" in c), None)
+    
+    # Helper to get df entries for a given date + shift
+    def has_prod(df, date, shift):
+        if shift_col is None:
+            return False
+        temp = df[(df["Date"] == date) & (df[shift_col].str.lower() == shift)]
+        return not temp.empty
+    
+    # Morning/Eve delivery check
+    def has_delivery(df, date):
+        return not df[df["Date"] == date].empty
+    
+    
+    missing_prod = []
+    missing_morning_delivery = []
+    missing_evening_delivery = []
+    
+    for d in all_dates:
+        date_str = d.strftime("%d-%m-%Y")
+    
+        # ------------------ Production (Morning & Evening) ------------------
+        # RULE: No missing for today before 06:00
+        if d == today and now.hour < 6:
+            pass  # Nothing expected yet
+        elif d == today and 6 <= now.hour < 18:
+            # Expect only morning
+            if not has_prod(df_cow_log, d, "morning"):
+                missing_prod.append([date_str, "Morning"])
+        else:
+            # For past days OR today after 18:00 → both expected
+            if not has_prod(df_cow_log, d, "morning"):
+                missing_prod.append([date_str, "Morning"])
+            if not has_prod(df_cow_log, d, "evening"):
+                missing_prod.append([date_str, "Evening"])
+    
+        # ------------------ Morning Delivery ------------------
+        # RULE: Not expected today before 06:00
+        if not (d == today and now.hour < 6):
+            if not has_delivery(df_milk_m, d):
+                missing_morning_delivery.append(date_str)
+    
+        # ------------------ Evening Delivery ------------------
+        # RULE: Not expected today before 18:00
+        if not (d == today and now.hour < 18):
+            if not has_delivery(df_milk_e, d):
+                missing_evening_delivery.append(date_str)
+    
+    
+    # ------------------ Display Missing Data ------------------
+    
+    st.markdown("### ❌ Missing Milk Production Records")
+    if missing_prod:
+        df_miss_prod = pd.DataFrame(missing_prod, columns=["Date", "Shift"])
+        st.table(df_miss_prod)
+    else:
+        st.success("All production records are complete!")
+    
+    st.markdown("### ❌ Missing Morning Delivery Records")
+    if missing_morning_delivery:
+        st.write(missing_morning_delivery)
+    else:
+        st.success("All morning delivery records are complete!")
+    
+    st.markdown("### ❌ Missing Evening Delivery Records")
+    if missing_evening_delivery:
+        st.write(missing_evening_delivery)
+    else:
+        st.success("All evening delivery records are complete!")
+
 
 # ----------------------------
 # MILKING & FEEDING PAGE
