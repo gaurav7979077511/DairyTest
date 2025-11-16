@@ -207,13 +207,23 @@ if page == "🏠 Dashboard":
     # --- Determine which distribution file to pick ---
     def get_latest_delivery(shift):
         target_df = df_milk_m if shift.lower() == "morning" else df_milk_e
+        if target_df.empty:
+            return None, shift, 0
+    
         df_sorted = target_df.sort_values("Date", ascending=False)
-        if df_sorted.empty:
-            return None, None, None
+    
         row = df_sorted.iloc[0]
-        total = row.select_dtypes(include='number').sum()
+    
+        # Convert all columns except "Date" to numeric and sum
+        total = pd.to_numeric(
+            row.drop(labels=["Date"], errors="ignore"),
+            errors="coerce"
+        ).sum()
+    
         date = row["Date"].strftime("%d-%m-%Y")
+    
         return date, shift, total
+
     
     # Case based assignment:
     # If latest produced shift is Morning → order: P(M), D(M), P(E), D(E)
