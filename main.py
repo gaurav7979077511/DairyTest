@@ -71,6 +71,16 @@ page = st.sidebar.radio(
 # ============================================================
 # 🏠 DASHBOARD PAGE
 # ============================================================
+import streamlit as st
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+# NOTE: This file assumes helper functions `load_csv(...)` and `sum_numeric_columns(...)`
+# are defined elsewhere in your app (as they were in your original code). This edit
+# updates the Dashboard layout and adds "Last Activity" metrics while keeping your
+# existing data loading and calculation logic intact.
+
 if page == "🏠 Dashboard":
 
     # -------------------- Custom Dark Mode CSS --------------------
@@ -82,8 +92,15 @@ if page == "🏠 Dashboard":
             --card-bg: #1a1d23;
             --text-color: #f0f2f6;
             --accent: #00FFFF;
+            --muted: #9aa3ac;
             --border-color: #00FFFF44;
             --shadow-color: #00FFFF22;
+            --btn-primary: #1E88E5; /* Milking & Feeding */
+            --btn-morning: #4CAF50; /* Morning Distribution */
+            --btn-evening: #FB8C00; /* Evening Distribution */
+            --btn-expense: #E53935; /* Expense */
+            --btn-payment: #8E24AA; /* Payment Received */
+            --btn-invest: #00897B; /* Investment */
         }
         @media (prefers-color-scheme: light) {
             :root {
@@ -91,29 +108,49 @@ if page == "🏠 Dashboard":
                 --card-bg: #ffffff;
                 --text-color: #000000;
                 --accent: #0077ff;
+                --muted: #54606a;
                 --border-color: #0077ff33;
                 --shadow-color: #0077ff11;
             }
         }
+
+        /* Page background & typography tweaks */
         .main { background-color: var(--bg-color); color: var(--text-color); }
+        .dashboard-card { background-color: var(--card-bg); border-radius: 14px; padding: 12px; }
+        .muted { color: var(--muted); }
+
+        /* Metric blocks (keeps streamlit metric style but tighter) */
         div[data-testid="stMetric"] {
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 15px;
-            padding: 15px;
-            box-shadow: 0 0 8px var(--shadow-color);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 0 10px var(--shadow-color);
             text-align: center;
         }
+
         h1, h2, h3 { color: var(--accent); }
         hr { border: 1px solid var(--border-color); }
         label, .stRadio { color: var(--text-color) !important; }
+
+        /* Button color helpers */
+        .btn { padding: 8px 16px; font-size: 14px; border: none; border-radius: 8px; color: white; cursor: pointer; }
+        .btn-primary { background-color: var(--btn-primary); }
+        .btn-morning { background-color: var(--btn-morning); }
+        .btn-evening { background-color: var(--btn-evening); }
+        .btn-expense { background-color: var(--btn-expense); }
+        .btn-payment { background-color: var(--btn-payment); }
+        .btn-invest { background-color: var(--btn-invest); }
+
+        /* small helpers */
+        .top-actions { display:flex; gap:12px; align-items:center; justify-content:flex-end; }
+        .metric-row { display:flex; gap:12px; align-items:stretch; }
+
         @media (max-width: 768px) {
-            div[data-testid="stMetric"] { padding: 10px; font-size: 0.85rem; }
+            div[data-testid="stMetric"] { padding: 8px; font-size: 0.85rem; }
             h1, h2, h3 { font-size: 1rem; }
+            .top-actions { flex-direction: column; align-items:stretch; }
         }
-        .radio-center { display: flex; justify-content: center; margin-top: 10px; margin-bottom: 25px; }
-        div[data-testid="stRadio"] > div { justify-content: center !important; }
-        div[data-testid="stRadio"] label { color: var(--text-color) !important; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -131,20 +168,85 @@ if page == "🏠 Dashboard":
     df_investment = load_csv(INVESTMENT_CSV_URL, drop_cols=["Timestamp"])
 
     # -------------------- Filter from 1 Nov 2025 --------------------
-    for df in [df_cow_log, df_expense, df_milk_m, df_milk_e, df_payment_received, df_investment]:
+    # NOTE: keep original behaviour but update in-place references where needed
+    for var_name, df in [("df_cow_log", df_cow_log), ("df_expense", df_expense), ("df_milk_m", df_milk_m), ("df_milk_e", df_milk_e), ("df_payment_received", df_payment_received), ("df_investment", df_investment)]:
         if "Date" in df.columns:
             df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
             df.dropna(subset=["Date"], inplace=True)
+            # keep rows from START_DATE onwards
             df = df[df["Date"] >= START_DATE]
+            # assign back to original var name in local scope
+            locals()[var_name] = df
+
+    # -------------------- Last Activity Summary (NEW) --------------------
+    # Last milking & feeding (use shift column if present)
+    if not df_cow_log.empty and "Date" in df_cow_log.columns:
+        last_milk_row = df_cow_log.sort_values("Date", ascending=False).iloc[0]
+        last_milk_feed_date = last_milk_row["Date"].strftime("%d %b %Y") if pd.notna(last_milk_row["Date"]) else "No Data"
+        # Try common shift column names
+        shift_cols = [c for c in df_cow_log.columns if "shift" in c.lower() or "पहर" in c.lower()]
+        last_milk_shift = last_milk_row[shift_cols[0]] if shift_cols else "Unknown"
+    else:
+        last_milk_feed_date = "No Data"
+        last_milk_shift = "Unknown"
+
+    # Last morning distribution (from df_milk_m)
+    if not df_milk_m.empty and "Date" in df_milk_m.columns:
+        last_morning_date_raw = df_milk_m["Date"].max()
+        last_morning_date = pd.to_datetime(last_morning_date_raw).strftime("%d %b %Y") if pd.notna(last_morning_date_raw) else "No Data"
+    else:
+        last_morning_date = "No Data"
+
+    # Last evening distribution (from df_milk_e)
+    if not df_milk_e.empty and "Date" in df_milk_e.columns:
+        last_evening_date_raw = df_milk_e["Date"].max()
+        last_evening_date = pd.to_datetime(last_evening_date_raw).strftime("%d %b %Y") if pd.notna(last_evening_date_raw) else "No Data"
+    else:
+        last_evening_date = "No Data"
+
+    # Time-since helpers (human readable)
+    def human_delta(last_date_str):
+        try:
+            d = pd.to_datetime(last_date_str)
+            delta = pd.Timestamp.now() - d
+            days = delta.days
+            hours = delta.seconds // 3600
+            if days > 0:
+                return f"{days}d {hours}h ago"
+            if hours > 0:
+                return f"{hours}h ago"
+            return "just now"
+        except Exception:
+            return "-"
+
+    # -------------------- Top action buttons (right aligned) --------------------
+    with st.container():
+        cols = st.columns([3, 1])
+        with cols[0]:
+            st.markdown("""<div style='margin-bottom:6px'><small class='muted'>Quick Actions</small></div>""", unsafe_allow_html=True)
+        with cols[1]:
+            st.markdown(
+                f"""
+                <div class='top-actions'>
+                    <a href='https://forms.gle/YourMilkingForm' target='_blank'><button class='btn btn-primary'>Milking & Feeding</button></a>
+                    <a href='https://forms.gle/vWfoRDfPtzJiTKZw7' target='_blank'><button class='btn btn-morning'>Morning Distribution</button></a>
+                    <a href='https://forms.gle/YourEveningForm' target='_blank'><button class='btn btn-evening'>Evening Distribution</button></a>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<hr/>", unsafe_allow_html=True)
 
     # -------------------- Lifetime Summary --------------------
     st.subheader("📊 Overall Summary")
 
-    milk_col = next((c for c in df_cow_log.columns if "milk" in c.lower() or "दूध" in c), None)
+    # keep existing milk column detection logic
+    milk_col = next((c for c in df_cow_log.columns if "milk" in c.lower() or "दूध" in c), None) if not df_cow_log.empty else None
     total_milk_produced = pd.to_numeric(df_cow_log[milk_col], errors="coerce").sum() if milk_col else 0
 
-    total_milk_m = sum_numeric_columns(df_milk_m, exclude_cols=["Timestamp", "Date"])
-    total_milk_e = sum_numeric_columns(df_milk_e, exclude_cols=["Timestamp", "Date"])
+    total_milk_m = sum_numeric_columns(df_milk_m, exclude_cols=["Timestamp", "Date"]) if 'df_milk_m' in locals() else 0
+    total_milk_e = sum_numeric_columns(df_milk_e, exclude_cols=["Timestamp", "Date"]) if 'df_milk_e' in locals() else 0
     total_milk_distributed = total_milk_m + total_milk_e
     remaining_milk = total_milk_produced - total_milk_distributed
 
@@ -169,17 +271,27 @@ if page == "🏠 Dashboard":
     )
     fund_bipin = investment_bipin + received_bipin - expense_bipin
 
-    # -------------------- Metrics --------------------
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("🥛 Total Milk Produced", f"{total_milk_produced:.2f} L")
-    c2.metric("🚚 Total Milk Distributed", f"{total_milk_distributed:.2f} L")
-    c3.metric("❗ Remaining / Lost Milk", f"{remaining_milk:.2f} L")
-    c4.metric("💸 Total Expense", f"₹{total_expense:,.2f}")
+    # -------------------- Display top metrics including last activity --------------------
+    # We show 3 fast activity metrics + 4 main metrics (arranged in two rows)
+    top1, top2, top3 = st.columns([1.5, 1.5, 1.5])
 
-    c5, c6, c7 = st.columns(3)
-    c5.metric("💰 Total Payment Received", f"₹{total_payment_received:,.2f}")
-    c6.metric("📈 Total Investment", f"₹{total_investment:,.2f}")
-    c7.metric("🏦 Fund (Bipin Kumar)", f"₹{fund_bipin:,.2f}")
+    top1.metric("🥛 Last Milking & Feeding", last_milk_feed_date, f"Shift: {last_milk_shift}")
+    top2.metric("🌅 Last Morning Distribution", last_morning_date, human_delta(last_morning_date_raw) if 'last_morning_date_raw' in locals() else "-")
+    top3.metric("🌇 Last Evening Distribution", last_evening_date, human_delta(last_evening_date_raw) if 'last_evening_date_raw' in locals() else "-")
+
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+    # Main summary metrics
+    r1, r2, r3, r4 = st.columns(4)
+    r1.metric("🥛 Total Milk Produced", f"{total_milk_produced:.2f} L")
+    r2.metric("🚚 Total Milk Distributed", f"{total_milk_distributed:.2f} L")
+    r3.metric("❗ Remaining / Lost Milk", f"{remaining_milk:.2f} L")
+    r4.metric("💸 Total Expense", f"₹{total_expense:,.2f}")
+
+    r5, r6, r7 = st.columns(3)
+    r5.metric("💰 Total Payment Received", f"₹{total_payment_received:,.2f}")
+    r6.metric("📈 Total Investment", f"₹{total_investment:,.2f}")
+    r7.metric("🏦 Fund (Bipin Kumar)", f"₹{fund_bipin:,.2f}")
 
     st.markdown("<hr/>", unsafe_allow_html=True)
 
@@ -199,10 +311,10 @@ if page == "🏠 Dashboard":
     df_month_cow_log = filter_month(df_cow_log)
     df_month_payment = filter_month(df_payment_received)
 
-    milk_col = next((c for c in df_month_cow_log.columns if "milk" in c.lower() or "दूध" in c), None)
+    milk_col = next((c for c in df_month_cow_log.columns if "milk" in c.lower() or "दूध" in c), None) if not df_month_cow_log.empty else None
     milk_month = pd.to_numeric(df_month_cow_log[milk_col], errors="coerce").sum() if milk_col else 0
-    milk_m_month = sum_numeric_columns(df_month_milk_m, exclude_cols=["Timestamp", "Date"])
-    milk_e_month = sum_numeric_columns(df_month_milk_e, exclude_cols=["Timestamp", "Date"])
+    milk_m_month = sum_numeric_columns(df_month_milk_m, exclude_cols=["Timestamp", "Date"]) if 'df_month_milk_m' in locals() else 0
+    milk_e_month = sum_numeric_columns(df_month_milk_e, exclude_cols=["Timestamp", "Date"]) if 'df_month_milk_e' in locals() else 0
     milk_distributed_month = milk_m_month + milk_e_month
     remaining_milk_month = milk_month - milk_distributed_month
 
@@ -219,9 +331,8 @@ if page == "🏠 Dashboard":
     st.markdown("<hr/>", unsafe_allow_html=True)
 
     # -------------------- Milk Production vs Delivery Graph --------------------
-    # -------------------- Milk Production vs Delivery Graph --------------------
     st.subheader("📈 Milk Production vs Delivery Trend")
-    
+
     # --- Centered Radio Button for Date Range
     col1, col2, col3 = st.columns([1, 3, 1])  # Center alignment
     with col2:
@@ -229,9 +340,9 @@ if page == "🏠 Dashboard":
             "",
             ["1 Week", "1 Month", "3 Months", "6 Months", "1 Year", "3 Years", "5 Years", "Max"],
             horizontal=True,
-            index=1,  # Default to "3 Months"
+            index=2,  # Default to "3 Months"
         )
-    
+
     # --- Determine date range based on selection
     today = pd.Timestamp.today()
     date_limit = {
@@ -244,32 +355,47 @@ if page == "🏠 Dashboard":
         "5 Years": today - pd.DateOffset(years=5),
         "Max": START_DATE,
     }[range_option]
-    
+
     # --- Prepare production data
     if not df_cow_log.empty and milk_col:
         df_cow_log["Date"] = pd.to_datetime(df_cow_log["Date"], errors="coerce")
         df_cow_log = df_cow_log[df_cow_log["Date"] >= date_limit]
         daily_prod = df_cow_log.groupby("Date")[milk_col].sum().reset_index()
+        daily_prod = daily_prod.rename(columns={milk_col: "Produced"})
     else:
-        daily_prod = pd.DataFrame(columns=["Date", "Produced"])
-    
+        daily_prod = pd.DataFrame(columns=["Date", "Produced"]) 
+
     # --- Combine morning & evening distribution
     def combine_distribution(df1, df2):
-        df_all = pd.concat([df1, df2])
-        df_all["Date"] = pd.to_datetime(df_all["Date"], errors="coerce")
-        df_all["Total"] = df_all.select_dtypes(include="number").sum(axis=1)
+        if df1 is None or df1.empty:
+            df1 = pd.DataFrame(columns=["Date"])
+        if df2 is None or df2.empty:
+            df2 = pd.DataFrame(columns=["Date"])
+        df_all = pd.concat([df1, df2], ignore_index=True, sort=False)
+        if "Date" in df_all.columns:
+            df_all["Date"] = pd.to_datetime(df_all["Date"], errors="coerce")
+        # sum numeric columns per row and then group by date
+        numeric = df_all.select_dtypes(include=["number"]).copy()
+        if numeric.shape[1] == 0:
+            df_all["Total"] = 0
+        else:
+            df_all["Total"] = numeric.sum(axis=1)
         return df_all.groupby("Date")["Total"].sum().reset_index()
-    
+
     df_delivery = combine_distribution(df_milk_m, df_milk_e)
-    df_delivery = df_delivery[df_delivery["Date"] >= date_limit]
-    
+    if not df_delivery.empty:
+        df_delivery = df_delivery[df_delivery["Date"] >= date_limit]
+
     # --- Display line chart
     if not daily_prod.empty and not df_delivery.empty:
         chart_df = pd.merge(daily_prod, df_delivery, on="Date", how="outer").fillna(0)
-        chart_df = chart_df.rename(columns={milk_col: "Produced", "Total": "Delivered"})
+        chart_df = chart_df.rename(columns={"Total": "Delivered"})
+        chart_df = chart_df.sort_values("Date")
         st.line_chart(chart_df.set_index("Date"))
     else:
         st.info("No sufficient data for chart.")
+
+    # End of Dashboard
 
 # ----------------------------
 # MILKING & FEEDING PAGE
