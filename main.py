@@ -282,7 +282,7 @@ elif page == "Milking & Feeding":
     with col2:
         st.markdown(
             f'<a href="https://forms.gle/4ywNpoYLr7LFQtxe8" target="_blank">'
-            f'<button style="background-color:#81C7F5; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">➕Milking & Feeding</button>'
+            f'<button style="background-color:#81C7F5; color:white; padding:8px 16px; font-size:14px; border:none; border-radius:5px;">Milking & Feeding</button>'
             f'</a>',
             unsafe_allow_html=True
         )
