@@ -183,6 +183,67 @@ if page == "🏠 Dashboard":
 
     st.markdown("<hr/>", unsafe_allow_html=True)
 
+    # -------------------- Latest Summary --------------------
+    st.subheader("🕒 Latest Summary")
+    
+    # --- Find last 2 milk produced records ---
+    df_sorted_prod = df_cow_log.sort_values("Date", ascending=False).head(2)
+    
+    def get_shift_total(row):
+        shift = row["Shift - पहर"] if "Shift - पहर" in row else row.get("Shift", "")
+        milk_value = row[milk_col] if milk_col in row else 0
+        milk_value = pd.to_numeric(milk_value, errors="coerce")
+        return shift, milk_value
+    
+    latest_prod_1 = df_sorted_prod.iloc[0]
+    latest_prod_2 = df_sorted_prod.iloc[1]
+    
+    shift1, milk1 = get_shift_total(latest_prod_1)
+    shift2, milk2 = get_shift_total(latest_prod_2)
+    
+    date1 = latest_prod_1["Date"].strftime("%d-%m-%Y")
+    date2 = latest_prod_2["Date"].strftime("%d-%m-%Y")
+    
+    # --- Determine which distribution file to pick ---
+    def get_latest_delivery(shift):
+        target_df = df_milk_m if shift.lower() == "morning" else df_milk_e
+        df_sorted = target_df.sort_values("Date", ascending=False)
+        if df_sorted.empty:
+            return None, None, None
+        row = df_sorted.iloc[0]
+        total = row.select_dtypes(include='number').sum()
+        date = row["Date"].strftime("%d-%m-%Y")
+        return date, shift, total
+    
+    # Case based assignment:
+    # If latest produced shift is Morning → order: P(M), D(M), P(E), D(E)
+    # If Evening → order: P(E), D(E), P(M), D(M)
+    is_morning_first = shift1.lower() == "morning"
+    
+    if is_morning_first:
+        p1_date, p1_shift, p1_total = date1, shift1, milk1
+        d1_date, d1_shift, d1_total = get_latest_delivery("morning")
+        p2_date, p2_shift, p2_total = date2, shift2, milk2
+        d2_date, d2_shift, d2_total = get_latest_delivery("evening")
+    else:
+        p1_date, p1_shift, p1_total = date1, shift1, milk1
+        d1_date, d1_shift, d1_total = get_latest_delivery("evening")
+        p2_date, p2_shift, p2_total = date2, shift2, milk2
+        d2_date, d2_shift, d2_total = get_latest_delivery("morning")
+    
+    # --- Layout: 4 Metric Blocks ---
+    lc1, lc2 = st.columns(2)
+    lc3, lc4 = st.columns(2)
+    
+    lc1.metric(f"🥛 Last Milk Produced ({p1_shift})", f"{p1_total} L", p1_date)
+    lc2.metric(f"🚚 Last Milk Delivered ({d1_shift})", f"{d1_total} L", d1_date)
+    
+    lc3.metric(f"🥛 Previous Milk Produced ({p2_shift})", f"{p2_total} L", p2_date)
+    lc4.metric(f"🚚 Previous Milk Delivered ({d2_shift})", f"{d2_total} L", d2_date)
+    
+    st.markdown("<hr/>", unsafe_allow_html=True)
+    
+
     # -------------------- Current Month Summary --------------------
     today = pd.Timestamp.today()
     current_month_name = today.strftime("%B %Y")
