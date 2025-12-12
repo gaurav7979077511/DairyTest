@@ -344,16 +344,17 @@ if page == "🏠 Dashboard":
         st.info("No sufficient data for chart.")
 
     # -------------------- Missing Entries CARDS (final colors + layout) --------------------
-    
+
     st.markdown("### 📌 Pending Entries")
+    
     
     VALIDATION_START = pd.Timestamp("2025-10-01")
     today_norm = pd.Timestamp.today().normalize()
     
-    # Compact sizing
-    CARD_WIDTH = "220px"
-    CARD_HEIGHT = "90px"
-    CARD_PADDING = "12px"
+    # Compact card sizing
+    CARD_WIDTH = "200px"
+    CARD_HEIGHT = "78px"      # reduced height
+    CARD_PADDING = "10px"     # reduced padding
     
     BASE_CARD_STYLE = (
         f"border-radius:12px; padding:{CARD_PADDING}; text-decoration:none; display:block;"
@@ -361,16 +362,15 @@ if page == "🏠 Dashboard":
         f"width:{CARD_WIDTH}; height:{CARD_HEIGHT}; box-sizing:border-box; overflow:hidden;"
     )
     
-    # All card text white now
-    TITLE_STYLE = "font-size:12px; color:#ffffff; opacity:0.95; margin:0 0 6px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
-    COWID_STYLE = "font-size:18px; font-weight:700; color:#ffffff; margin:0; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
-    DATE_STYLE = "color:#ffffff; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+    TITLE_STYLE = "font-size:12px; color:#ffffff; opacity:0.95; margin:0 0 4px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+    COWID_STYLE = "font-size:18px; font-weight:700; color:#ffffff; margin:0 0 4px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+    DATE_STYLE = "color:#ffffff; font-size:12px; white-space:nowrap;"
     BOTTOM_ROW_STYLE = "display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%;"
     
-    # pill: dark semi-opaque background with white text (so pill readable on any gradient)
-    PILL_STYLE = "background:rgba(0,0,0,0.18); color:#ffffff; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap;"
+    # White pill with dark text
+    PILL_STYLE = "background:#ffffff; color:#222; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700;"
     
-    # Form URL templates (with CowID)
+    # -------------------- Google Form Templates --------------------
     cow_form_template = (
         "https://docs.google.com/forms/d/e/1FAIpQLSeTgPYBAXYFihUg6xMoZx8DkJfizPE1jAZlVMa9kgGTlhSEew/viewform"
         "?usp=pp_url&entry.1575375539={DATE}&entry.1560275875={SHIFT}&entry.1484558388={COWID}"
@@ -384,226 +384,173 @@ if page == "🏠 Dashboard":
         "?usp=pp_url&entry.1311650896={DATE}"
     )
     
-    # Final gradients per your request
+    # -------------------- Final Gradients --------------------
     gradients = {
-        # Milking & Feeding - pink gradient (same for morning & evening)
-        "milking": "linear-gradient(135deg,#ff4e8b 0%,#ff9ab0 100%)",
-        # Distribution - morning yellow, evening blue
-        "dist_morning": "linear-gradient(135deg,#f7971e 0%,#ffd200 100%)",
-        "dist_evening": "linear-gradient(135deg,#00c6ff 0%,#0072ff 100%)",
+        "milking": "linear-gradient(135deg,#ff512f 0%,#dd2476 100%)",   # 🔥 Red gradient
+        "dist_morning": "linear-gradient(135deg,#f7971e 0%,#ffd200 100%)",  # Yellow
+        "dist_evening": "linear-gradient(135deg,#00c6ff 0%,#0072ff 100%)",  # Blue
     }
     
-    if VALIDATION_START > today_norm:
-        st.info(f"Validation will start from {VALIDATION_START.strftime('%Y-%m-%d')}.")
-    else:
-        # Use copies of dataframes
-        cow_log = df_cow_log.copy() if df_cow_log is not None else pd.DataFrame()
-        milk_m = df_milk_m.copy() if df_milk_m is not None else pd.DataFrame()
-        milk_e = df_milk_e.copy() if df_milk_e is not None else pd.DataFrame()
+    # -------------------- Normalize Dates --------------------
+    cow_log = df_cow_log.copy() if df_cow_log is not None else pd.DataFrame()
+    milk_m = df_milk_m.copy() if df_milk_m is not None else pd.DataFrame()
+    milk_e = df_milk_e.copy() if df_milk_e is not None else pd.DataFrame()
     
-        # Normalize "Date" columns (day-first tolerant)
-        for dfr in [cow_log, milk_m, milk_e]:
-            if dfr is None or dfr.empty:
-                continue
-            if "Date" in dfr.columns:
-                dfr["Date"] = pd.to_datetime(dfr["Date"], dayfirst=True, errors="coerce")
+    for dfr in [cow_log, milk_m, milk_e]:
+        if not dfr.empty and "Date" in dfr.columns:
+            dfr["Date"] = pd.to_datetime(dfr["Date"], dayfirst=True, errors="coerce")
     
-        # Detect shift & cowid columns
-        shift_col = None
-        cowid_col = None
-        if not cow_log.empty:
+    # Detect shift + cowid column
+    shift_col = None
+    cowid_col = None
+    if not cow_log.empty:
+        for c in cow_log.columns:
+            if "shift" in c.lower() or "पहर" in c:
+                shift_col = c
+            if "cow" in c.lower():
+                cowid_col = c
+        if cowid_col is None:
             for c in cow_log.columns:
-                if "shift" in c.lower() or "पहर" in c:
-                    shift_col = c
-                if "cow" in c.lower():
+                if c.strip().lower() in ["cowid", "cow id", "cow_id"]:
                     cowid_col = c
-            if cowid_col is None:
-                for c in cow_log.columns:
-                    if c.strip().lower() in ["cowid", "cow id", "cow_id"]:
-                        cowid_col = c
-                        break
+                    break
     
-        # Helper functions
-        def has_shift_on_date_for_cow(df, date, shift_col, cowid_col, cowid_value, shift_name):
-            if df is None or df.empty or shift_col is None or cowid_col is None:
-                return False
-            mask = (df["Date"].dt.normalize() == date.normalize()) & (df[cowid_col].astype(str).str.strip() == str(cowid_value).strip())
-            if not mask.any():
-                return False
-            vals = df.loc[mask, shift_col].dropna().astype(str).str.lower().str.strip().tolist()
-            if not vals:
-                return False
-            joined = " ".join(vals)
-            if shift_name.lower() == "morning":
-                return any(k in joined for k in ["morning", "mor", "सुबह", "भोर", "am"])
+    def has_shift_on_date_for_cow(df, date, shift_col, cowid_col, cowid_value, shift_name):
+        if df is None or df.empty or shift_col is None or cowid_col is None:
+            return False
+        mask = (df["Date"].dt.normalize() == date.normalize()) & (df[cowid_col].astype(str).str.strip() == str(cowid_value).strip())
+        if not mask.any(): return False
+        vals = df.loc[mask, shift_col].dropna().astype(str).str.lower().tolist()
+        if not vals: return False
+        joined = " ".join(vals)
+        if shift_name == "Morning":
+            return any(k in joined for k in ["morning","mor","सुबह","am"])
+        return any(k in joined for k in ["evening","eve","शाम","pm"])
+    
+    def has_any_on_date(df, date):
+        if df is None or df.empty or "Date" not in df.columns:
+            return False
+        return not df[df["Date"].dt.normalize() == date.normalize()].empty
+    
+    missing_cards = []
+    
+    # -------------------- Milking & Feeding (Per CowID) --------------------
+    if cowid_col and not cow_log.empty:
+        cow_ids = cow_log[cowid_col].dropna().astype(str).str.strip().unique().tolist()
+        for cowid in cow_ids:
+            cow_rows = cow_log[cow_log[cowid_col].astype(str).str.strip() == cowid]
+            if cow_rows.empty: continue
+            first_date = cow_rows["Date"].min()
+            cow_start = max(VALIDATION_START, first_date.normalize())
+    
+            for d in pd.date_range(cow_start, today_norm):
+                ds = d.strftime("%Y-%m-%d")
+    
+                # Missing Morning
+                if not has_shift_on_date_for_cow(cow_log, d, shift_col, cowid_col, cowid, "Morning"):
+                    url = cow_form_template.format(
+                        DATE=urllib.parse.quote(ds),
+                        SHIFT="Morning",
+                        COWID=urllib.parse.quote(cowid)
+                    )
+                    missing_cards.append({
+                        "kind": "milking",
+                        "cowid": cowid,
+                        "date": ds,
+                        "shift": "Morning",
+                        "url": url,
+                        "gradient": gradients["milking"]
+                    })
+    
+                # Missing Evening
+                if not has_shift_on_date_for_cow(cow_log, d, shift_col, cowid_col, cowid, "Evening"):
+                    url = cow_form_template.format(
+                        DATE=urllib.parse.quote(ds),
+                        SHIFT="Evening",
+                        COWID=urllib.parse.quote(cowid)
+                    )
+                    missing_cards.append({
+                        "kind": "milking",
+                        "cowid": cowid,
+                        "date": ds,
+                        "shift": "Evening",
+                        "url": url,
+                        "gradient": gradients["milking"]
+                    })
+    
+    # -------------------- Distribution (Global Morning + Evening) --------------------
+    for d in pd.date_range(VALIDATION_START, today_norm):
+        ds = d.strftime("%Y-%m-%d")
+    
+        if not has_any_on_date(milk_m, d):
+            missing_cards.append({
+                "kind": "distribution",
+                "date": ds,
+                "shift": "Morning",
+                "url": morning_milk_form.format(DATE=urllib.parse.quote(ds)),
+                "gradient": gradients["dist_morning"]
+            })
+    
+        if not has_any_on_date(milk_e, d):
+            missing_cards.append({
+                "kind": "distribution",
+                "date": ds,
+                "shift": "Evening",
+                "url": evening_milk_form.format(DATE=urllib.parse.quote(ds)),
+                "gradient": gradients["dist_evening"]
+            })
+    
+    # -------------------- Render Cards in Flex Grid --------------------
+    if not missing_cards:
+        st.success("No pending entries detected.")
+    else:
+        html_parts = []
+    
+        # Flex grid styling
+        html_parts.append(
+            "<style>"
+            ".card-container { display:flex; flex-wrap:wrap; gap:12px 14px; row-gap:14px; }"
+            ".card-item { flex:0 0 auto; }"
+            "@media(max-width:600px){ .card-item { flex:0 0 48%; } }"
+            "</style>"
+        )
+    
+        html_parts.append('<div class="card-container">')
+    
+        for card in missing_cards:
+            gradient = card["gradient"]
+    
+            # Build card inner HTML
+            if card["kind"] == "milking":
+                inner = (
+                    f"<div style='{TITLE_STYLE}'>Milking & Feeding</div>"
+                    f"<div style='{COWID_STYLE}'>{card['cowid']}</div>"
+                    f"<div style='{BOTTOM_ROW_STYLE}'>"
+                    f"<div style='{DATE_STYLE}'>{card['date']}</div>"
+                    f"<div style='{PILL_STYLE}'>{card['shift']}</div>"
+                    "</div>"
+                )
             else:
-                return any(k in joined for k in ["evening", "eve", "शाम", "pm", "even"])
+                inner = (
+                    f"<div style='{TITLE_STYLE}'>Milk Distribution</div>"
+                    f"<div style='font-size:15px; font-weight:800; margin:0 0 4px 0;'>{card['date']}</div>"
+                    f"<div style='display:flex; justify-content:flex-end;'>"
+                    f"<div style='{PILL_STYLE}'>{card['shift']}</div>"
+                    "</div>"
+                )
     
-        def has_any_on_date(df, date):
-            if df is None or df.empty or "Date" not in df.columns:
-                return False
-            return not df[df["Date"].dt.normalize() == date.normalize()].empty
-    
-        missing_cards = []
-    
-        # Per-CowID Milking & Feeding validation (both shifts use same milking gradient)
-        if cowid_col and not cow_log.empty:
-            cow_ids = cow_log[cowid_col].dropna().astype(str).str.strip().unique().tolist()
-            for cowid in cow_ids:
-                cow_rows = cow_log[cow_log[cowid_col].astype(str).str.strip() == str(cowid).strip()]
-                if cow_rows.empty or "Date" not in cow_rows.columns:
-                    continue
-                first_date = cow_rows["Date"].min()
-                cow_start = max(VALIDATION_START, pd.to_datetime(first_date).normalize())
-                if cow_start > today_norm:
-                    continue
-                for d in pd.date_range(start=cow_start, end=today_norm, freq="D"):
-                    date_str = d.strftime("%Y-%m-%d")
-                    # missing morning
-                    if not has_shift_on_date_for_cow(cow_log, d, shift_col, cowid_col, cowid, "Morning"):
-                        url = cow_form_template.format(
-                            DATE=urllib.parse.quote(date_str, safe=""),
-                            SHIFT=urllib.parse.quote("Morning", safe=""),
-                            COWID=urllib.parse.quote(str(cowid).strip(), safe="")
-                        )
-                        missing_cards.append({
-                            "kind": "milking",
-                            "cowid": cowid,
-                            "date": date_str,
-                            "shift": "Morning",
-                            "url": url,
-                            "gradient": gradients["milking"]
-                        })
-                    # missing evening
-                    if not has_shift_on_date_for_cow(cow_log, d, shift_col, cowid_col, cowid, "Evening"):
-                        url = cow_form_template.format(
-                            DATE=urllib.parse.quote(date_str, safe=""),
-                            SHIFT=urllib.parse.quote("Evening", safe=""),
-                            COWID=urllib.parse.quote(str(cowid).strip(), safe="")
-                        )
-                        missing_cards.append({
-                            "kind": "milking",
-                            "cowid": cowid,
-                            "date": date_str,
-                            "shift": "Evening",
-                            "url": url,
-                            "gradient": gradients["milking"]
-                        })
-        else:
-            # fallback: date-based check without cowid
-            for d in pd.date_range(start=VALIDATION_START, end=today_norm, freq="D"):
-                date_str = d.strftime("%Y-%m-%d")
-                if not has_shift_on_date_for_cow(cow_log, d, shift_col, cowid_col, "", "Morning"):
-                    url = cow_form_template.format(DATE=urllib.parse.quote(date_str, safe=""), SHIFT=urllib.parse.quote("Morning", safe=""), COWID=urllib.parse.quote("", safe=""))
-                    missing_cards.append({"kind":"milking","cowid":"","date":date_str,"shift":"Morning","url":url,"gradient":gradients["milking"]})
-                if not has_shift_on_date_for_cow(cow_log, d, shift_col, cowid_col, "", "Evening"):
-                    url = cow_form_template.format(DATE=urllib.parse.quote(date_str, safe=""), SHIFT=urllib.parse.quote("Evening", safe=""), COWID=urllib.parse.quote("", safe=""))
-                    missing_cards.append({"kind":"milking","cowid":"","date":date_str,"shift":"Evening","url":url,"gradient":gradients["milking"]})
-    
-        # Global Milk Distribution validation (one per date)
-        for d in pd.date_range(start=VALIDATION_START, end=today_norm, freq="D"):
-            date_str = d.strftime("%Y-%m-%d")
-            if not has_any_on_date(milk_m, d):
-                url = morning_milk_form.format(DATE=urllib.parse.quote(date_str, safe=""))
-                missing_cards.append({
-                    "kind": "distribution",
-                    "date": date_str,
-                    "shift": "Morning",
-                    "url": url,
-                    "gradient": gradients["dist_morning"]
-                })
-            if not has_any_on_date(milk_e, d):
-                url = evening_milk_form.format(DATE=urllib.parse.quote(date_str, safe=""))
-                missing_cards.append({
-                    "kind": "distribution",
-                    "date": date_str,
-                    "shift": "Evening",
-                    "url": url,
-                    "gradient": gradients["dist_evening"]
-                })
-    
-        # ---------- Render ALL cards as a single HTML block (horizontal grid, wrapped rows) ----------
-        if not missing_cards:
-            st.success("No pending entries detected.")
-        else:
-            # Build a single HTML string for the whole container + cards
-            html_parts = []
-        
-            # Styles (single st.markdown call)
-            styles = (
-                '<style>'
-                '.card-container { display:flex; flex-wrap:wrap; gap:12px 14px; row-gap:16px; align-items:flex-start; }'
-                '.card-item { flex:0 0 auto; }'
-                '@media (max-width:600px) { .card-item { flex: 0 0 48%; } }'  # two columns on small screens
-                '</style>'
+            # Wrap card HTML
+            html_parts.append(
+                f"<div class='card-item'>"
+                f"<a href='{card['url']}' target='_blank' style='text-decoration:none;'>"
+                f"<div style='{BASE_CARD_STYLE} background:{gradient};'>{inner}</div>"
+                f"</a></div>"
             )
-            html_parts.append(styles)
-        
-            # Open container
-            html_parts.append('<div class="card-container">')
-        
-            # Build each card HTML and append
-            for card in missing_cards:
-                # choose gradient
-                if card["kind"] == "milking":
-                    gradient = "linear-gradient(135deg, #ff5f8d 0%, #ff8fb3 100%)"  # pink
-                else:
-                    if card["shift"] == "Morning":
-                        gradient = "linear-gradient(135deg, #ffb300 0%, #ffd54f 100%)"  # yellow
-                    else:
-                        gradient = "linear-gradient(135deg, #0091ff 0%, #4fb3ff 100%)"  # blue
-        
-                # common card container style (fixed width, compact)
-                card_style = (
-                    'width:200px; padding:14px; border-radius:14px; '
-                    f'background:{gradient}; color:#ffffff; '
-                    'box-shadow:0 6px 16px rgba(0,0,0,0.28); '
-                    'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;'
-                    'box-sizing:border-box;'
-                )
-        
-                # inside elements styles
-                title_html = '<div style="font-size:12px; opacity:0.95; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
-                # Build card inner HTML depending on type
-                if card["kind"] == "milking":
-                    inner = (
-                        title_html + 'Milking & Feeding</div>'
-                        f'<div style="font-size:18px; font-weight:800; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{card.get("cowid","")}</div>'
-                        '<div style="display:flex; justify-content:space-between; align-items:center;">'
-                        f'<div style="font-size:12px; font-weight:600;">{card["date"]}</div>'
-                        '<div style="background:rgba(0,0,0,0.18); padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; color:#ffffff;">'
-                        f'{card["shift"]}</div>'
-                        '</div>'
-                    )
-                else:
-                    # Distribution: title centered, date left + shift pill right on same row visually
-                    inner = (
-                        title_html + 'Milk Distribution</div>'
-                        f'<div style="font-size:15px; font-weight:800; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{card["date"]}</div>'
-                        '<div style="display:flex; justify-content:space-between; align-items:center;">'
-                        '<div></div>'  # left spacer (keeps balance)
-                        '<div style="background:rgba(0,0,0,0.18); padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; color:#ffffff;">'
-                        f'{card["shift"]}</div>'
-                        '</div>'
-                    )
-        
-                # full card HTML (link wrapping)
-                card_html = (
-                    '<div class="card-item">'
-                    f'<a href="{card["url"]}" target="_blank" style="text-decoration:none;">'
-                    f'<div style="{card_style}">{inner}</div>'
-                    '</a>'
-                    '</div>'
-                )
-        
-                html_parts.append(card_html)
-        
-            # Close container
-            html_parts.append('</div>')
-        
-            # Render once
-            full_html = ''.join(html_parts)
-            st.markdown(full_html, unsafe_allow_html=True)
+    
+        html_parts.append("</div>")
+    
+        st.markdown("".join(html_parts), unsafe_allow_html=True)
+
         
         
 
