@@ -347,7 +347,7 @@ if page == "🏠 Dashboard":
     
     st.markdown("### 📌 Pending Entries")
     
-    VALIDATION_START = pd.Timestamp("2025-12-01")
+    VALIDATION_START = pd.Timestamp("2025-10-01")
     today_norm = pd.Timestamp.today().normalize()
     
     # Compact sizing
