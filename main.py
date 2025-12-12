@@ -522,88 +522,88 @@ if page == "🏠 Dashboard":
                     "gradient": gradients["dist_evening"]
                 })
     
-        # ---------- Render ALL cards as a single HTML block (horizontal grid, wrapped rows) ----------
+        # -------------------- Render Cards (scoped CSS, safe) --------------------
         if not missing_cards:
             st.success("No pending entries detected.")
         else:
-            # Build a single HTML string for the whole container + cards
+            # Build single HTML string for container + cards, fully scoped to avoid global style leakage
             html_parts = []
         
-            # Styles (single st.markdown call)
-            styles = (
-                '<style>'
-                '.card-container { display:flex; flex-wrap:wrap; gap:12px 14px; row-gap:16px; align-items:flex-start; }'
-                '.card-item { flex:0 0 auto; }'
-                '@media (max-width:600px) { .card-item { flex: 0 0 48%; } }'  # two columns on small screens
-                '</style>'
+            # Scoped CSS: everything inside #pending-cards-root only
+            html_parts.append(
+                "<style>"
+                /* container + card-item */
+                "#pending-cards-root .card-container { display:flex; flex-wrap:wrap; gap:12px 14px; row-gap:14px; align-items:flex-start; }"
+                "#pending-cards-root .card-item { flex:0 0 auto; }"
+                /* responsive: two columns on narrow screens */
+                "@media(max-width:600px){ #pending-cards-root .card-item { flex:0 0 48%; } }"
+                /* ensure no global body/background overrides */
+                "#pending-cards-root .card-inner { box-sizing:border-box; }"
+                "</style>"
             )
-            html_parts.append(styles)
         
-            # Open container
+            # Open root container (scoped)
+            html_parts.append("<div id='pending-cards-root'>")
             html_parts.append('<div class="card-container">')
         
-            # Build each card HTML and append
+            # Build each card (unchanged logic for gradients)
             for card in missing_cards:
-                # choose gradient
-                if card["kind"] == "milking":
-                    gradient = "linear-gradient(135deg, #ff5f8d 0%, #ff8fb3 100%)"  # pink
-                else:
-                    if card["shift"] == "Morning":
-                        gradient = "linear-gradient(135deg, #ffb300 0%, #ffd54f 100%)"  # yellow
-                    else:
-                        gradient = "linear-gradient(135deg, #0091ff 0%, #4fb3ff 100%)"  # blue
-        
-                # common card container style (fixed width, compact)
-                card_style = (
-                    'width:200px; padding:14px; border-radius:14px; '
-                    f'background:{gradient}; color:#ffffff; '
-                    'box-shadow:0 6px 16px rgba(0,0,0,0.28); '
-                    'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;'
-                    'box-sizing:border-box;'
+                gradient = card.get("gradient") or (
+                    "linear-gradient(135deg,#ff512f 0%,#dd2476 100%)" if card["kind"] == "milking"
+                    else ("linear-gradient(135deg,#f7971e 0%,#ffd200 100%)" if card["shift"] == "Morning" else "linear-gradient(135deg,#00c6ff 0%,#0072ff 100%)")
                 )
         
-                # inside elements styles
-                title_html = '<div style="font-size:12px; opacity:0.95; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
-                # Build card inner HTML depending on type
+                # Compact fixed-size card — explicit inline styles (scoped)
+                card_style = (
+                    "width:200px; height:78px; padding:10px; border-radius:14px; "
+                    f"background:{gradient}; color:#ffffff; "
+                    "box-shadow:0 6px 16px rgba(0,0,0,0.28); "
+                    "font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;"
+                    "overflow:hidden; display:flex; flex-direction:column; justify-content:space-between;"
+                )
+        
+                # inner parts (text forced to white)
+                title_html = "<div style='font-size:12px; color:#ffffff; opacity:0.95; margin:0 0 4px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>"
+                cowid_html = "<div style='font-size:18px; font-weight:800; color:#ffffff; margin:0 0 4px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>"
+                date_html = "<div style='color:#ffffff; font-size:12px; font-weight:600; white-space:nowrap;'>"
+                pill_html_open = "<div style='background:#ffffff; color:#111111; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap;'>"
+                pill_html_close = "</div>"
+        
                 if card["kind"] == "milking":
                     inner = (
-                        title_html + 'Milking & Feeding</div>'
-                        f'<div style="font-size:18px; font-weight:800; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{card.get("cowid","")}</div>'
-                        '<div style="display:flex; justify-content:space-between; align-items:center;">'
-                        f'<div style="font-size:12px; font-weight:600;">{card["date"]}</div>'
-                        '<div style="background:rgba(0,0,0,0.18); padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; color:#ffffff;">'
-                        f'{card["shift"]}</div>'
-                        '</div>'
+                        title_html + "Milking & Feeding</div>"
+                        + cowid_html + f"{card.get('cowid','')}</div>"
+                        + "<div style='display:flex; justify-content:space-between; align-items:center;'>"
+                        + date_html + f"{card['date']}</div>"
+                        + pill_html_open + f"{card['shift']}" + pill_html_close
+                        + "</div>"
                     )
                 else:
-                    # Distribution: title centered, date left + shift pill right on same row visually
                     inner = (
-                        title_html + 'Milk Distribution</div>'
-                        f'<div style="font-size:15px; font-weight:800; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{card["date"]}</div>'
-                        '<div style="display:flex; justify-content:space-between; align-items:center;">'
-                        '<div></div>'  # left spacer (keeps balance)
-                        '<div style="background:rgba(0,0,0,0.18); padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; color:#ffffff;">'
-                        f'{card["shift"]}</div>'
-                        '</div>'
+                        title_html + "Milk Distribution</div>"
+                        + "<div style='font-size:15px; font-weight:800; color:#ffffff; margin:0 0 4px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>" + f"{card['date']}</div>"
+                        + "<div style='display:flex; justify-content:flex-end; align-items:center;'>"
+                        + pill_html_open + f"{card['shift']}" + pill_html_close
+                        + "</div>"
                     )
         
-                # full card HTML (link wrapping)
+                # wrap card (scoped classes)
                 card_html = (
-                    '<div class="card-item">'
-                    f'<a href="{card["url"]}" target="_blank" style="text-decoration:none;">'
-                    f'<div style="{card_style}">{inner}</div>'
-                    '</a>'
-                    '</div>'
+                    "<div class='card-item'>"
+                    f"<a href='{card['url']}' target='_blank' style='text-decoration:none;'>"
+                    f"<div class='card-inner' style=\"{card_style}\">"
+                    f"{inner}"
+                    "</div></a></div>"
                 )
         
                 html_parts.append(card_html)
         
             # Close container
-            html_parts.append('</div>')
+            html_parts.append("</div></div>")
         
-            # Render once
-            full_html = ''.join(html_parts)
-            st.markdown(full_html, unsafe_allow_html=True)
+            # Render in one call (safe)
+            st.markdown("".join(html_parts), unsafe_allow_html=True)
+
         
         
 
