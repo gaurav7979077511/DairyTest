@@ -346,7 +346,7 @@ if page == "🏠 Dashboard":
     st.subheader("📢 Missing / Pending Data (Validation from 01-Dec-2025)")
     
     # Validation start date (inclusive)
-    VALIDATION_START = pd.Timestamp("2025-12-01")
+    VALIDATION_START = pd.Timestamp("2025-10-01")
     
     # Ensure Date columns are datetime (do not mutate originals - work on copies)
     cow_log = df_cow_log.copy() if df_cow_log is not None else pd.DataFrame()
