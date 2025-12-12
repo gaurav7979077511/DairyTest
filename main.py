@@ -342,6 +342,178 @@ if page == "🏠 Dashboard":
     else:
         st.info("No sufficient data for chart.")
 
+    # -------------------- Missing Entries Detector (validation from 01-Dec-2025) --------------------
+st.subheader("📢 Missing / Pending Data (Validation from 01-Dec-2025)")
+
+# Validation start date (inclusive)
+VALIDATION_START = pd.Timestamp("2025-12-01")
+
+# Ensure Date columns are datetime (do not mutate originals - work on copies)
+cow_log = df_cow_log.copy() if df_cow_log is not None else pd.DataFrame()
+milk_m = df_milk_m.copy() if df_milk_m is not None else pd.DataFrame()
+milk_e = df_milk_e.copy() if df_milk_e is not None else pd.DataFrame()
+
+def ensure_date_col(df):
+    if df is None or df.empty:
+        return df
+    if "Date" not in df.columns:
+        return df
+    # try multiple parsing strategies, prefer day-first for dd-mm-yyyy
+    df = df.copy()
+    df["Date"] = pd.to_datetime(df["Date"], dayfirst=True, errors="coerce")
+    return df
+
+cow_log = ensure_date_col(cow_log)
+milk_m = ensure_date_col(milk_m)
+milk_e = ensure_date_col(milk_e)
+
+# find shift column name in cow_log (could be "Shift - पहर" or "Shift")
+shift_col = None
+if not cow_log.empty:
+    for c in cow_log.columns:
+        if "shift" in c.lower() or "पहर" in c:
+            shift_col = c
+            break
+
+# Helper functions to detect shift/records on a date
+def has_shift_on_date(df, date, shift_col, shift_name):
+    """Return True if df has a record on `date` with shift matching shift_name (morning/evening)."""
+    if df is None or df.empty or shift_col is None:
+        return False
+    # subset rows for that date
+    mask_date = df["Date"].dt.normalize() == date.normalize()
+    rows = df.loc[mask_date, shift_col].dropna().astype(str).str.lower().str.strip()
+    if rows.empty:
+        return False
+    s = " ".join(rows.tolist())
+    if shift_name == "morning":
+        return "mor" in s or "सुबह" in s or "भोर" in s or "am" in s
+    else:
+        # evening
+        return "eve" in s or "शाम" in s or "pm" in s or "even" in s
+
+def has_any_record_on_date(df, date):
+    """Return True if df has at least one record on `date` (Date column must exist)."""
+    if df is None or df.empty or "Date" not in df.columns:
+        return False
+    return not df[df["Date"].dt.normalize() == date.normalize()].empty
+
+# Build date range for validation
+today_norm = pd.Timestamp.today().normalize()
+if VALIDATION_START > today_norm:
+    # nothing to validate yet
+    st.info(f"Validation will start from {VALIDATION_START.strftime('%d-%m-%Y')}.")
+else:
+    date_range = pd.date_range(start=VALIDATION_START, end=today_norm, freq="D")
+
+    missing_list = []  # per-date summary dictionary
+
+    for d in date_range:
+        missing_morning_prod = not has_shift_on_date(cow_log, d, shift_col, "morning")
+        missing_evening_prod = not has_shift_on_date(cow_log, d, shift_col, "evening")
+        missing_morning_dist = not has_any_record_on_date(milk_m, d)
+        missing_evening_dist = not has_any_record_on_date(milk_e, d)
+
+        # only consider missing if actually expected (we always expect both shifts for past days)
+        # Additional business rules could be inserted here (e.g., for today's partial expectations)
+        missing_any = missing_morning_prod or missing_evening_prod or missing_morning_dist or missing_evening_dist
+
+        if missing_any:
+            missing_list.append({
+                "Date": d.strftime("%Y-%m-%d"),
+                "Missing_Morning_Production": missing_morning_prod,
+                "Missing_Evening_Production": missing_evening_prod,
+                "Missing_Morning_Distribution": missing_morning_dist,
+                "Missing_Evening_Distribution": missing_evening_dist,
+            })
+
+    # Convert to DataFrame for display
+    if len(missing_list) == 0:
+        st.success("✅ No missing entries detected from 01-Dec-2025 to today.")
+    else:
+        df_missing = pd.DataFrame(missing_list)
+        # prettier summary columns
+        def summarize_row(row):
+            parts = []
+            if row["Missing_Morning_Production"]:
+                parts.append("Prod: Morning")
+            if row["Missing_Evening_Production"]:
+                parts.append("Prod: Evening")
+            if row["Missing_Morning_Distribution"]:
+                parts.append("Dist: Morning")
+            if row["Missing_Evening_Distribution"]:
+                parts.append("Dist: Evening")
+            return "; ".join(parts) if parts else "None"
+
+        df_missing["Issues"] = df_missing.apply(summarize_row, axis=1)
+        df_missing_display = df_missing[["Date", "Issues",
+                                         "Missing_Morning_Production",
+                                         "Missing_Evening_Production",
+                                         "Missing_Morning_Distribution",
+                                         "Missing_Evening_Distribution"]]
+
+        st.markdown("### ❗ Missing Records by Date")
+        st.dataframe(df_missing_display.sort_values("Date", ascending=False), use_container_width=True)
+
+        # Show quick counts
+        total_missing_dates = df_missing.shape[0]
+        total_missing_morning_prod = df_missing["Missing_Morning_Production"].sum()
+        total_missing_evening_prod = df_missing["Missing_Evening_Production"].sum()
+        total_missing_morning_dist = df_missing["Missing_Morning_Distribution"].sum()
+        total_missing_evening_dist = df_missing["Missing_Evening_Distribution"].sum()
+
+        st.markdown("### Summary")
+        s1, s2, s3, s4, s5 = st.columns(5)
+        s1.metric("Dates with any missing", f"{total_missing_dates}")
+        s2.metric("Missing Morning Prod", f"{int(total_missing_morning_prod)}")
+        s3.metric("Missing Evening Prod", f"{int(total_missing_evening_prod)}")
+        s4.metric("Missing Morning Dist", f"{int(total_missing_morning_dist)}")
+        s5.metric("Missing Evening Dist", f"{int(total_missing_evening_dist)}")
+
+        # ---- Provide CSV downloads to help auto-populate/fill missing records ----
+        st.markdown("### Download CSVs to help fill missing records")
+        st.markdown("You can download CSV templates with missing rows and then upload/update your sheets.")
+
+        # Prepare cow_log missing rows: one row per missing shift
+        cow_missing_rows = []
+        for _, row in df_missing.iterrows():
+            date = row["Date"]
+            if row["Missing_Morning_Production"]:
+                cow_missing_rows.append({"Date": date, "Shift - पहर": "Morning", "CowID": "", "Milk": ""})
+            if row["Missing_Evening_Production"]:
+                cow_missing_rows.append({"Date": date, "Shift - पहर": "Evening", "CowID": "", "Milk": ""})
+
+        df_cow_missing_csv = pd.DataFrame(cow_missing_rows, columns=["Date", "Shift - पहर", "CowID", "Milk"])
+        df_morning_missing_csv = pd.DataFrame(
+            [{"Date": r} for r in df_missing.loc[df_missing["Missing_Morning_Distribution"], "Date"].tolist()],
+            columns=["Date"]
+        )
+        df_evening_missing_csv = pd.DataFrame(
+            [{"Date": r} for r in df_missing.loc[df_missing["Missing_Evening_Distribution"], "Date"].tolist()],
+            columns=["Date"]
+        )
+
+        # Download buttons
+        col_dl1, col_dl2, col_dl3 = st.columns(3)
+        if not df_cow_missing_csv.empty:
+            csv1 = df_cow_missing_csv.to_csv(index=False).encode("utf-8")
+            col_dl1.download_button("Download cow_log missing rows (CSV)", csv1, file_name="cow_log_missing.csv", mime="text/csv")
+        else:
+            col_dl1.write("No missing cow_log rows")
+
+        if not df_morning_missing_csv.empty:
+            csv2 = df_morning_missing_csv.to_csv(index=False).encode("utf-8")
+            col_dl2.download_button("Download morning distribution missing (CSV)", csv2, file_name="milk_m_missing.csv", mime="text/csv")
+        else:
+            col_dl2.write("No missing morning distribution rows")
+
+        if not df_evening_missing_csv.empty:
+            csv3 = df_evening_missing_csv.to_csv(index=False).encode("utf-8")
+            col_dl3.download_button("Download evening distribution missing (CSV)", csv3, file_name="milk_e_missing.csv", mime="text/csv")
+        else:
+            col_dl3.write("No missing evening distribution rows")
+
+
 # ----------------------------
 # MILKING & FEEDING PAGE
 # ----------------------------
