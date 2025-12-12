@@ -343,13 +343,13 @@ if page == "🏠 Dashboard":
     else:
         st.info("No sufficient data for chart.")
 
-    # -------------------- Missing Entries CARDS (from 2025-12-01) --------------------
+    # -------------------- Missing Entries CARDS (from 2025-12-01) with per-CowID validation --------------------
     st.markdown("### 📌 Missing Entries (actionable cards)")
     
-    VALIDATION_START = pd.Timestamp("2025-10-01")
+    VALIDATION_START = pd.Timestamp("2025-12-01")
     today_norm = pd.Timestamp.today().normalize()
     
-    # Styling constants (single string values; use single quotes inside CSS to avoid conflicts)
+    # Styling constants
     STYLING_CARD = (
         "border-radius:12px; padding:14px 18px; color:#ffffff; text-decoration:none; display:block;"
         "box-shadow:0 6px 18px rgba(0,0,0,0.18); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;"
@@ -357,10 +357,10 @@ if page == "🏠 Dashboard":
     CARD_TITLE_STYLE = "font-weight:700; font-size:16px; margin-bottom:6px;"
     CARD_DATE_STYLE = "font-size:13px; opacity:0.95;"
     
-    # Form URL templates (prefilled)
+    # Form URL templates (now includes CowID for cow_form_template)
     cow_form_template = (
         "https://docs.google.com/forms/d/e/1FAIpQLSeTgPYBAXYFihUg6xMoZx8DkJfizPE1jAZlVMa9kgGTlhSEew/viewform"
-        "?usp=pp_url&entry.1575375539={DATE}&entry.1560275875={SHIFT}"
+        "?usp=pp_url&entry.1575375539={DATE}&entry.1560275875={SHIFT}&entry.1484558388={COWID}"
     )
     morning_milk_form = (
         "https://docs.google.com/forms/d/e/1FAIpQLSfULz5JiL--wG71GWq7_OED16pTu5fc4xPa3u1dyLo7Y1lURw/viewform"
@@ -371,7 +371,7 @@ if page == "🏠 Dashboard":
         "?usp=pp_url&entry.1311650896={DATE}"
     )
     
-    # Gradients (tweak if you want to match exact Pending Collection)
+    # Gradients
     gradients = {
         "cow_morning": "linear-gradient(90deg, #FF7E79 0%, #FFB199 100%)",
         "cow_evening": "linear-gradient(90deg, #7CC6FF 0%, #80FFDA 100%)",
@@ -379,7 +379,7 @@ if page == "🏠 Dashboard":
         "milk_evening": "linear-gradient(90deg, #C3A3FF 0%, #7EA8FF 100%)",
     }
     
-    # If validation start is in the future, tell user and skip
+    # If validation start is in the future, show message
     if VALIDATION_START > today_norm:
         st.info(f"Validation will start from {VALIDATION_START.strftime('%Y-%m-%d')}.")
     else:
@@ -388,7 +388,7 @@ if page == "🏠 Dashboard":
         milk_m = df_milk_m.copy() if df_milk_m is not None else pd.DataFrame()
         milk_e = df_milk_e.copy() if df_milk_e is not None else pd.DataFrame()
     
-        # Normalize Date columns (day-first tolerant)
+        # Normalize Date columns
         for dfr in [cow_log, milk_m, milk_e]:
             if dfr is None or dfr.empty:
                 continue
@@ -403,12 +403,20 @@ if page == "🏠 Dashboard":
                     shift_col = c
                     break
     
-        # Helper functions
-        def has_shift_on_date(df, date, shift_col, shift_name):
-            """Return True if df has a record on `date` with shift matching shift_name ('Morning'/'Evening')."""
-            if df is None or df.empty or shift_col is None:
+        # Detect CowID column (look for a column name containing 'cow' or 'cowid')
+        cowid_col = None
+        if not cow_log.empty:
+            for c in cow_log.columns:
+                if "cow" in c.lower():
+                    cowid_col = c
+                    break
+    
+        # Helper: per-cow shift existence
+        def has_shift_on_date_for_cow(df, date, shift_col, cowid_col, cowid_value, shift_name):
+            """Return True if df has a record for cowid_value on `date` with shift matching shift_name."""
+            if df is None or df.empty or shift_col is None or cowid_col is None:
                 return False
-            mask = df["Date"].dt.normalize() == date.normalize()
+            mask = (df["Date"].dt.normalize() == date.normalize()) & (df[cowid_col].astype(str).str.strip() == str(cowid_value).strip())
             if not mask.any():
                 return False
             vals = df.loc[mask, shift_col].dropna().astype(str).str.lower().str.strip().tolist()
@@ -420,47 +428,95 @@ if page == "🏠 Dashboard":
             else:
                 return any(k in joined for k in ["evening", "eve", "शाम", "pm", "even"])
     
+        # Helper: any record on date (for milk_m / milk_e)
         def has_any_on_date(df, date):
-            """Return True if df has at least one record on `date`."""
             if df is None or df.empty or "Date" not in df.columns:
                 return False
             return not df[df["Date"].dt.normalize() == date.normalize()].empty
     
-        # Build date range
-        date_range = pd.date_range(start=VALIDATION_START, end=today_norm, freq="D")
+        missing_cards = []
     
-        missing_cards = []  # list of dicts: {title, date, url, gradient}
+        # --- Per-CowID validation for cow_log ---
+        if cowid_col and not cow_log.empty:
+            # get unique cow ids
+            cow_ids = cow_log[cowid_col].dropna().astype(str).str.strip().unique().tolist()
+            for cowid in cow_ids:
+                # compute cow-specific start date = max(VALIDATION_START, first entry date for that cow)
+                cow_rows = cow_log[cow_log[cowid_col].astype(str).str.strip() == str(cowid).strip()]
+                if cow_rows.empty or "Date" not in cow_rows.columns:
+                    continue
+                first_date = cow_rows["Date"].min()
+                cow_start = max(VALIDATION_START, pd.to_datetime(first_date).normalize())
     
-        for d in date_range:
+                if cow_start > today_norm:
+                    continue
+    
+                # iterate dates for this cow
+                for d in pd.date_range(start=cow_start, end=today_norm, freq="D"):
+                    date_str = d.strftime("%Y-%m-%d")
+    
+                    # Morning missing for this cow
+                    if not has_shift_on_date_for_cow(cow_log, d, shift_col, cowid_col, cowid, "Morning"):
+                        url = cow_form_template.format(
+                            DATE=urllib.parse.quote(date_str, safe=""),
+                            SHIFT=urllib.parse.quote("Morning", safe=""),
+                            COWID=urllib.parse.quote(str(cowid).strip(), safe="")
+                        )
+                        missing_cards.append({
+                            "title": f"Cow Log – Morning Missing ({cowid})",
+                            "date": date_str,
+                            "url": url,
+                            "gradient": gradients["cow_morning"]
+                        })
+    
+                    # Evening missing for this cow
+                    if not has_shift_on_date_for_cow(cow_log, d, shift_col, cowid_col, cowid, "Evening"):
+                        url = cow_form_template.format(
+                            DATE=urllib.parse.quote(date_str, safe=""),
+                            SHIFT=urllib.parse.quote("Evening", safe=""),
+                            COWID=urllib.parse.quote(str(cowid).strip(), safe="")
+                        )
+                        missing_cards.append({
+                            "title": f"Cow Log – Evening Missing ({cowid})",
+                            "date": date_str,
+                            "url": url,
+                            "gradient": gradients["cow_evening"]
+                        })
+        else:
+            # fallback: if no CowID column, do previous date-based (non-per-cow) check
+            date_range = pd.date_range(start=VALIDATION_START, end=today_norm, freq="D")
+            for d in date_range:
+                date_str = d.strftime("%Y-%m-%d")
+                if not has_shift_on_date_for_cow(cow_log, d, shift_col, cowid_col, "", "Morning"):
+                    url = cow_form_template.format(
+                        DATE=urllib.parse.quote(date_str, safe=""),
+                        SHIFT=urllib.parse.quote("Morning", safe=""),
+                        COWID=urllib.parse.quote("", safe="")
+                    )
+                    missing_cards.append({
+                        "title": "Cow Log – Morning Missing",
+                        "date": date_str,
+                        "url": url,
+                        "gradient": gradients["cow_morning"]
+                    })
+                if not has_shift_on_date_for_cow(cow_log, d, shift_col, cowid_col, "", "Evening"):
+                    url = cow_form_template.format(
+                        DATE=urllib.parse.quote(date_str, safe=""),
+                        SHIFT=urllib.parse.quote("Evening", safe=""),
+                        COWID=urllib.parse.quote("", safe="")
+                    )
+                    missing_cards.append({
+                        "title": "Cow Log – Evening Missing",
+                        "date": date_str,
+                        "url": url,
+                        "gradient": gradients["cow_evening"]
+                    })
+    
+        # --- Global checks for milk_m and milk_e (one per date) ---
+        # Build a single date range for these (start = VALIDATION_START)
+        date_range_global = pd.date_range(start=VALIDATION_START, end=today_norm, freq="D")
+        for d in date_range_global:
             date_str = d.strftime("%Y-%m-%d")
-    
-            # Cow log missing Morning
-            if not has_shift_on_date(cow_log, d, shift_col, "Morning"):
-                url = cow_form_template.format(
-                    DATE=urllib.parse.quote(date_str, safe=""),
-                    SHIFT=urllib.parse.quote("Morning", safe="")
-                )
-                missing_cards.append({
-                    "title": "Cow Log – Morning Missing",
-                    "date": date_str,
-                    "url": url,
-                    "gradient": gradients["cow_morning"]
-                })
-    
-            # Cow log missing Evening
-            if not has_shift_on_date(cow_log, d, shift_col, "Evening"):
-                url = cow_form_template.format(
-                    DATE=urllib.parse.quote(date_str, safe=""),
-                    SHIFT=urllib.parse.quote("Evening", safe="")
-                )
-                missing_cards.append({
-                    "title": "Cow Log – Evening Missing",
-                    "date": date_str,
-                    "url": url,
-                    "gradient": gradients["cow_evening"]
-                })
-    
-            # Morning milk missing
             if not has_any_on_date(milk_m, d):
                 url = morning_milk_form.format(DATE=urllib.parse.quote(date_str, safe=""))
                 missing_cards.append({
@@ -469,8 +525,6 @@ if page == "🏠 Dashboard":
                     "url": url,
                     "gradient": gradients["milk_morning"]
                 })
-    
-            # Evening milk missing
             if not has_any_on_date(milk_e, d):
                 url = evening_milk_form.format(DATE=urllib.parse.quote(date_str, safe=""))
                 missing_cards.append({
@@ -489,7 +543,6 @@ if page == "🏠 Dashboard":
                 row_cards = missing_cards[i:i + columns_per_row]
                 cols = st.columns(len(row_cards))
                 for col, card in zip(cols, row_cards):
-                    # Build HTML with concatenated f-strings (safe, no triple-quote issues)
                     html = (
                         f'<a href="{card["url"]}" target="_blank" style="text-decoration:none;">'
                         f'<div style="{STYLING_CARD} background: {card["gradient"]};">'
