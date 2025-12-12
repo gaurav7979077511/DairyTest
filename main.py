@@ -343,31 +343,32 @@ if page == "🏠 Dashboard":
     else:
         st.info("No sufficient data for chart.")
 
-    # -------------------- Missing Entries CARDS (compact, styled) - updated colors & layout --------------------
-
-    st.markdown("### 📌 Missing Entries (actionable cards)")
+    # -------------------- Missing Entries CARDS (final colors + layout) --------------------
+    
+    st.markdown("### 📌 Pending Entries")
     
     VALIDATION_START = pd.Timestamp("2025-12-01")
     today_norm = pd.Timestamp.today().normalize()
     
-    # Compact styling constants
-    CARD_WIDTH = "220px"   # shorter width so more cards fit per row
-    CARD_HEIGHT = "90px"   # compact height
+    # Compact sizing
+    CARD_WIDTH = "220px"
+    CARD_HEIGHT = "90px"
     CARD_PADDING = "12px"
     
     BASE_CARD_STYLE = (
         f"border-radius:12px; padding:{CARD_PADDING}; text-decoration:none; display:block;"
         f"box-shadow:0 6px 18px rgba(0,0,0,0.18); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial;"
-        f"width:{CARD_WIDTH}; height:{CARD_HEIGHT}; box-sizing:border-box;"
+        f"width:{CARD_WIDTH}; height:{CARD_HEIGHT}; box-sizing:border-box; overflow:hidden;"
     )
     
-    # TEXT colors changed to black for readability
-    TITLE_STYLE = "font-size:12px; color:#000000; opacity:0.95; margin:0 0 4px 0;"
-    COWID_STYLE = "font-size:18px; font-weight:700; color:#000000; margin:0; line-height:1;"
-    BOTTOM_ROW_STYLE = "display:flex; justify-content:space-between; align-items:center; gap:8px;"
+    # All card text white now
+    TITLE_STYLE = "font-size:12px; color:#ffffff; opacity:0.95; margin:0 0 6px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+    COWID_STYLE = "font-size:18px; font-weight:700; color:#ffffff; margin:0; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+    DATE_STYLE = "color:#ffffff; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+    BOTTOM_ROW_STYLE = "display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%;"
     
-    # pill badge style (white pill, black text)
-    PILL_STYLE = "background:#ffffff; color:#000000; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:600;"
+    # pill: dark semi-opaque background with white text (so pill readable on any gradient)
+    PILL_STYLE = "background:rgba(0,0,0,0.18); color:#ffffff; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap;"
     
     # Form URL templates (with CowID)
     cow_form_template = (
@@ -383,22 +384,24 @@ if page == "🏠 Dashboard":
         "?usp=pp_url&entry.1311650896={DATE}"
     )
     
-    # Gradients - keep milking gradient identical for both shifts
+    # Final gradients per your request
     gradients = {
-        "milking": "linear-gradient(135deg,#6a11cb 0%,#2575fc 100%)",        # purple -> blue (used for both Morning/Evening milking)
-        "dist_morning": "linear-gradient(135deg,#f7971e 0%,#ffd200 100%)",  # gold
-        "dist_evening": "linear-gradient(135deg,#00c6ff 0%,#0072ff 100%)",  # aqua -> blue
+        # Milking & Feeding - pink gradient (same for morning & evening)
+        "milking": "linear-gradient(135deg,#ff4e8b 0%,#ff9ab0 100%)",
+        # Distribution - morning yellow, evening blue
+        "dist_morning": "linear-gradient(135deg,#f7971e 0%,#ffd200 100%)",
+        "dist_evening": "linear-gradient(135deg,#00c6ff 0%,#0072ff 100%)",
     }
     
     if VALIDATION_START > today_norm:
         st.info(f"Validation will start from {VALIDATION_START.strftime('%Y-%m-%d')}.")
     else:
-        # Work on copies
+        # Use copies of dataframes
         cow_log = df_cow_log.copy() if df_cow_log is not None else pd.DataFrame()
         milk_m = df_milk_m.copy() if df_milk_m is not None else pd.DataFrame()
         milk_e = df_milk_e.copy() if df_milk_e is not None else pd.DataFrame()
     
-        # Normalize Date columns
+        # Normalize "Date" columns (day-first tolerant)
         for dfr in [cow_log, milk_m, milk_e]:
             if dfr is None or dfr.empty:
                 continue
@@ -414,7 +417,6 @@ if page == "🏠 Dashboard":
                     shift_col = c
                 if "cow" in c.lower():
                     cowid_col = c
-            # prefer exact "CowID" if present
             if cowid_col is None:
                 for c in cow_log.columns:
                     if c.strip().lower() in ["cowid", "cow id", "cow_id"]:
@@ -488,37 +490,15 @@ if page == "🏠 Dashboard":
                             "gradient": gradients["milking"]
                         })
         else:
-            # Fallback: non-per-cow check
+            # fallback: date-based check without cowid
             for d in pd.date_range(start=VALIDATION_START, end=today_norm, freq="D"):
                 date_str = d.strftime("%Y-%m-%d")
                 if not has_shift_on_date_for_cow(cow_log, d, shift_col, cowid_col, "", "Morning"):
-                    url = cow_form_template.format(
-                        DATE=urllib.parse.quote(date_str, safe=""),
-                        SHIFT=urllib.parse.quote("Morning", safe=""),
-                        COWID=urllib.parse.quote("", safe="")
-                    )
-                    missing_cards.append({
-                        "kind": "milking",
-                        "cowid": "",
-                        "date": date_str,
-                        "shift": "Morning",
-                        "url": url,
-                        "gradient": gradients["milking"]
-                    })
+                    url = cow_form_template.format(DATE=urllib.parse.quote(date_str, safe=""), SHIFT=urllib.parse.quote("Morning", safe=""), COWID=urllib.parse.quote("", safe=""))
+                    missing_cards.append({"kind":"milking","cowid":"","date":date_str,"shift":"Morning","url":url,"gradient":gradients["milking"]})
                 if not has_shift_on_date_for_cow(cow_log, d, shift_col, cowid_col, "", "Evening"):
-                    url = cow_form_template.format(
-                        DATE=urllib.parse.quote(date_str, safe=""),
-                        SHIFT=urllib.parse.quote("Evening", safe=""),
-                        COWID=urllib.parse.quote("", safe="")
-                    )
-                    missing_cards.append({
-                        "kind": "milking",
-                        "cowid": "",
-                        "date": date_str,
-                        "shift": "Evening",
-                        "url": url,
-                        "gradient": gradients["milking"]
-                    })
+                    url = cow_form_template.format(DATE=urllib.parse.quote(date_str, safe=""), SHIFT=urllib.parse.quote("Evening", safe=""), COWID=urllib.parse.quote("", safe=""))
+                    missing_cards.append({"kind":"milking","cowid":"","date":date_str,"shift":"Evening","url":url,"gradient":gradients["milking"]})
     
         # Global Milk Distribution validation (one per date)
         for d in pd.date_range(start=VALIDATION_START, end=today_norm, freq="D"):
@@ -542,7 +522,7 @@ if page == "🏠 Dashboard":
                     "gradient": gradients["dist_evening"]
                 })
     
-        # Render cards (compact grid). Use 4 columns per row
+        # Render cards in grid
         if not missing_cards:
             st.success("No missing actionable entries detected (from 2025-12-01).")
         else:
@@ -551,36 +531,34 @@ if page == "🏠 Dashboard":
                 row_cards = missing_cards[i:i + columns_per_row]
                 cols = st.columns(len(row_cards), gap="small")
                 for col, card in zip(cols, row_cards):
-                    # Milking & Feeding card: Title ("Milking & Feeding"), CowID (large), bottom row date (left) & shift (right)
                     if card["kind"] == "milking":
+                        # Milking & Feeding: title, CowID, bottom row date left & shift right
                         html = (
                             f'<a href="{card["url"]}" target="_blank" style="text-decoration:none;">'
                             f'<div style="{BASE_CARD_STYLE} background:{card["gradient"]};">'
                             f'<div style="{TITLE_STYLE}">Milking & Feeding</div>'
                             f'<div style="{COWID_STYLE}">{card.get("cowid","")}</div>'
                             f'<div style="{BOTTOM_ROW_STYLE}">'
-                            f'<div style="color:#000000; font-size:12px;">{card["date"]}</div>'
+                            f'<div style="{DATE_STYLE}">{card["date"]}</div>'
                             f'<div style="{PILL_STYLE}">{card["shift"]}</div>'
                             f'</div>'
                             f'</div>'
                             f'</a>'
                         )
                     else:
-                        # Milk Distribution: Title at top, date left, shift pill right
+                        # Milk Distribution: title, date left & shift pill right (same row)
                         html = (
                             f'<a href="{card["url"]}" target="_blank" style="text-decoration:none;">'
                             f'<div style="{BASE_CARD_STYLE} background:{card["gradient"]};">'
                             f'<div style="{TITLE_STYLE}">Milk Distribution</div>'
-                            f'<div style="font-size:14px; font-weight:700; color:#000000; margin:0 0 6px 0;">{card["date"]}</div>'
                             f'<div style="{BOTTOM_ROW_STYLE}">'
-                            f'<div></div>'  # left spacer (keeps date aligned to left visually)
+                            f'<div style="{DATE_STYLE}">{card["date"]}</div>'
                             f'<div style="{PILL_STYLE}">{card["shift"]}</div>'
                             f'</div>'
                             f'</div>'
                             f'</a>'
                         )
                     col.markdown(html, unsafe_allow_html=True)
-
 
 
 # ----------------------------
