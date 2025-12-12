@@ -1007,18 +1007,24 @@ elif page == "Manage Customers":
         except Exception:
             st.error("Missing libraries for Google Sheets. Install: pip install gspread oauth2client")
             raise
-
-        import json
-        sa_json = st.secrets.get("gcp_service_account")
-        if not sa_json:
+    
+        # FIX: st.secrets already returns a dict (AttrDict)
+        sa_dict = dict(st.secrets.get("gcp_service_account", {}))
+    
+        if not sa_dict:
             st.error("Service account JSON missing. Add it to Streamlit secrets as 'gcp_service_account'.")
             raise RuntimeError("Missing service account JSON in secrets")
-
-        cred_dict = json.loads(sa_json)
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(cred_dict, scopes=scope)
+    
+        scope = [
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive",
+        ]
+    
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(sa_dict, scopes=scope)
         client = gspread.authorize(creds)
+    
         return client
+
 
     def open_customer_sheet():
         client = init_gsheets()
