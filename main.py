@@ -522,80 +522,90 @@ if page == "🏠 Dashboard":
                     "gradient": gradients["dist_evening"]
                 })
     
-        # ---------- Render Cards in a Tight Flex Grid ----------
+        # ---------- Render ALL cards as a single HTML block (horizontal grid, wrapped rows) ----------
         if not missing_cards:
             st.success("No pending entries detected.")
         else:
-            st.markdown(
+            # Build a single HTML string for the whole container + cards
+            html_parts = []
+        
+            # Styles (single st.markdown call)
+            styles = (
                 '<style>'
-                '.card-container { display:flex; flex-wrap:wrap; gap:12px; row-gap:16px; }'
+                '.card-container { display:flex; flex-wrap:wrap; gap:12px 14px; row-gap:16px; align-items:flex-start; }'
                 '.card-item { flex:0 0 auto; }'
-                '</style>',
-                unsafe_allow_html=True
+                '@media (max-width:600px) { .card-item { flex: 0 0 48%; } }'  # two columns on small screens
+                '</style>'
             )
+            html_parts.append(styles)
         
-            st.markdown('<div class="card-container">', unsafe_allow_html=True)
+            # Open container
+            html_parts.append('<div class="card-container">')
         
+            # Build each card HTML and append
             for card in missing_cards:
-        
-                # ---------------- Colors ----------------
+                # choose gradient
                 if card["kind"] == "milking":
-                    gradient = "linear-gradient(135deg, #ff5f8d 0%, #ff8fb3 100%)"  # Pink
+                    gradient = "linear-gradient(135deg, #ff5f8d 0%, #ff8fb3 100%)"  # pink
                 else:
                     if card["shift"] == "Morning":
-                        gradient = "linear-gradient(135deg, #ffb300 0%, #ffd54f 100%)"  # Yellow
+                        gradient = "linear-gradient(135deg, #ffb300 0%, #ffd54f 100%)"  # yellow
                     else:
-                        gradient = "linear-gradient(135deg, #0091ff 0%, #4fb3ff 100%)"  # Blue
+                        gradient = "linear-gradient(135deg, #0091ff 0%, #4fb3ff 100%)"  # blue
         
-                # ---------- Build HTML safely ----------
+                # common card container style (fixed width, compact)
+                card_style = (
+                    'width:200px; padding:14px; border-radius:14px; '
+                    f'background:{gradient}; color:#ffffff; '
+                    'box-shadow:0 6px 16px rgba(0,0,0,0.28); '
+                    'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;'
+                    'box-sizing:border-box;'
+                )
+        
+                # inside elements styles
+                title_html = '<div style="font-size:12px; opacity:0.95; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
+                # Build card inner HTML depending on type
                 if card["kind"] == "milking":
-                    html = (
-                        '<div class="card-item">'
-                        f'<a href="{card["url"]}" target="_blank" style="text-decoration:none;">'
-                        f'<div style="width:180px; padding:14px; border-radius:18px; '
-                        f'background:{gradient}; color:#ffffff; '
-                        'box-shadow:0 4px 12px rgba(0,0,0,0.25); '
-                        'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;">'
-        
-                        '<div style="font-size:12px; opacity:0.9;">Milking & Feeding</div>'
-        
-                        f'<div style="font-size:20px; font-weight:700; margin-top:4px;">{card["cowid"]}</div>'
-        
-                        '<div style="display:flex; justify-content:space-between; margin-top:6px;">'
-                        f'<div style="font-size:12px; font-weight:500;">{card["date"]}</div>'
-                        f'<div style="background:rgba(255,255,255,0.25); padding:4px 10px; border-radius:999px; '
-                        'font-size:12px; font-weight:600;">'
+                    inner = (
+                        title_html + 'Milking & Feeding</div>'
+                        f'<div style="font-size:18px; font-weight:800; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{card.get("cowid","")}</div>'
+                        '<div style="display:flex; justify-content:space-between; align-items:center;">'
+                        f'<div style="font-size:12px; font-weight:600;">{card["date"]}</div>'
+                        '<div style="background:rgba(0,0,0,0.18); padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; color:#ffffff;">'
                         f'{card["shift"]}</div>'
                         '</div>'
-        
-                        '</div></a></div>'
                     )
                 else:
-                    html = (
-                        '<div class="card-item">'
-                        f'<a href="{card["url"]}" target="_blank" style="text-decoration:none;">'
-                        f'<div style="width:180px; padding:14px; border-radius:18px; '
-                        f'background:{gradient}; color:#ffffff; '
-                        'box-shadow:0 4px 12px rgba(0,0,0,0.25); '
-                        'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;">'
-        
-                        '<div style="text-align:center; font-size:12px; opacity:0.9;">Milk Distribution</div>'
-        
-                        f'<div style="text-align:center; font-size:18px; font-weight:700; margin-top:6px;">{card["date"]}</div>'
-        
-                        '<div style="display:flex; justify-content:center; margin-top:8px;">'
-                        f'<div style="background:rgba(255,255,255,0.25); padding:4px 12px; border-radius:999px; '
-                        'font-size:12px; font-weight:600;">'
+                    # Distribution: title centered, date left + shift pill right on same row visually
+                    inner = (
+                        title_html + 'Milk Distribution</div>'
+                        f'<div style="font-size:15px; font-weight:800; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{card["date"]}</div>'
+                        '<div style="display:flex; justify-content:space-between; align-items:center;">'
+                        '<div></div>'  # left spacer (keeps balance)
+                        '<div style="background:rgba(0,0,0,0.18); padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; color:#ffffff;">'
                         f'{card["shift"]}</div>'
                         '</div>'
-        
-                        '</div></a></div>'
                     )
         
-                st.markdown(html, unsafe_allow_html=True)
+                # full card HTML (link wrapping)
+                card_html = (
+                    '<div class="card-item">'
+                    f'<a href="{card["url"]}" target="_blank" style="text-decoration:none;">'
+                    f'<div style="{card_style}">{inner}</div>'
+                    '</a>'
+                    '</div>'
+                )
         
-            st.markdown('</div>', unsafe_allow_html=True)
-
+                html_parts.append(card_html)
+        
+            # Close container
+            html_parts.append('</div>')
+        
+            # Render once
+            full_html = ''.join(html_parts)
+            st.markdown(full_html, unsafe_allow_html=True)
+        
+        
 
 
 # ----------------------------
