@@ -387,7 +387,7 @@ if page == "🏠 Dashboard":
     # Final gradients per your request
     gradients = {
         # Milking & Feeding - pink gradient (same for morning & evening)
-        "milking": "linear-gradient(135deg,#ff4e8b 0%,#ff9ab0 100%)",
+        "milking": "linear-gradient(135deg,#ff512f 0%,#dd2476 100%)",
         # Distribution - morning yellow, evening blue
         "dist_morning": "linear-gradient(135deg,#f7971e 0%,#ffd200 100%)",
         "dist_evening": "linear-gradient(135deg,#00c6ff 0%,#0072ff 100%)",
