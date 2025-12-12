@@ -346,7 +346,7 @@ if page == "🏠 Dashboard":
     # -------------------- Missing Entries CARDS (from 2025-12-01) --------------------
     st.markdown("### 📌 Missing Entries (actionable cards)")
     
-    VALIDATION_START = pd.Timestamp("2025-12-01")
+    VALIDATION_START = pd.Timestamp("2025-10-01")
     today_norm = pd.Timestamp.today().normalize()
     
     # Styling constants (single string values; use single quotes inside CSS to avoid conflicts)
