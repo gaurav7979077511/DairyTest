@@ -984,7 +984,7 @@ elif page == "Investments":
     st.dataframe(df_invest, use_container_width=True if not df_invest.empty else False)
 
 # ----------------------------
-# MANAGE CUSTOMERS PAGE (compatible: no st.modal)
+# MANAGE CUSTOMERS PAGE (complete block including helpers)
 # ----------------------------
 elif page == "Manage Customers":
     st.title("👥 Manage Customers")
@@ -995,20 +995,145 @@ elif page == "Manage Customers":
     )
     CUSTOMER_SHEET_TAB = "Sheet1"
 
-    # ---------- Make sure session state flags exist ----------
+    # ---------- GSheets helpers (defined here so they're available) ----------
+    def init_gsheets():
+        try:
+            import gspread
+            from oauth2client.service_account import ServiceAccountCredentials
+        except Exception:
+            st.error("Missing libraries for Google Sheets. Install: pip install gspread oauth2client")
+            raise
+
+        import json
+        # st.secrets may already provide a dict-like object (AttrDict); convert safely
+        sa = st.secrets.get("gcp_service_account", None)
+        if sa is None:
+            st.error("Service account JSON missing. Add it to Streamlit secrets as 'gcp_service_account'.")
+            raise RuntimeError("Missing service account JSON in secrets")
+
+        # If secrets item is a string, parse JSON; if dict-like, convert to dict
+        if isinstance(sa, str):
+            cred_dict = json.loads(sa)
+        else:
+            # AttrDict or dict
+            cred_dict = dict(sa)
+
+        scope = [
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive",
+        ]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(cred_dict, scopes=scope)
+        client = gspread.authorize(creds)
+        return client
+
+    def open_customer_sheet():
+        client = init_gsheets()
+        sh = client.open_by_key(CUSTOMER_SHEET_ID)
+        try:
+            worksheet = sh.worksheet(CUSTOMER_SHEET_TAB)
+        except Exception:
+            worksheet = sh.get_worksheet(0)
+        return worksheet
+
+    def get_customers_df():
+        try:
+            ws = open_customer_sheet()
+            all_vals = ws.get_all_values()
+            if not all_vals or len(all_vals) <= 1:
+                cols = ["CustomerID", "Name", "Phone", "Email", "DateOfJoining", "Shift", "Status", "Timestamp"]
+                return pd.DataFrame(columns=cols)
+            df = pd.DataFrame(all_vals[1:], columns=all_vals[0])
+            df.columns = [c.strip() for c in df.columns]
+            return df
+        except Exception as e:
+            st.error(f"Failed to read customer sheet: {e}")
+            return pd.DataFrame()
+
+    def ensure_header(ws):
+        header = ws.row_values(1)
+        if not header:
+            header = ["CustomerID", "Name", "Phone", "Email", "DateOfJoining", "Shift", "Status", "Timestamp"]
+            ws.insert_row(header, index=1)
+        return header
+
+    def add_customer_row(row_dict):
+        try:
+            ws = open_customer_sheet()
+            header = ensure_header(ws)
+            row = [row_dict.get(h, "") for h in header]
+            ws.append_row(row, value_input_option="USER_ENTERED")
+            return True
+        except Exception as e:
+            st.error(f"Failed to add customer: {e}")
+            return False
+
+    def find_row_number_by_customerid(ws, customer_id):
+        all_vals = ws.get_all_values()
+        if not all_vals or len(all_vals) < 2:
+            return None, None
+        header = all_vals[0]
+        cust_idx = None
+        for idx, col in enumerate(header):
+            if col.strip().lower() == "customerid":
+                cust_idx = idx
+                break
+        if cust_idx is None:
+            return None, header
+        row_num = None
+        for r_idx, row in enumerate(all_vals[1:], start=2):
+            if str(row[cust_idx]).strip() == str(customer_id).strip():
+                row_num = r_idx
+                break
+        return row_num, header
+
+    def update_customer_by_id(customer_id, updated_dict):
+        try:
+            ws = open_customer_sheet()
+            row_num, header = find_row_number_by_customerid(ws, customer_id)
+            if row_num is None:
+                st.error("CustomerID not found.")
+                return False
+            for col_idx, col_name in enumerate(header, start=1):
+                if col_name in updated_dict:
+                    ws.update_cell(row_num, col_idx, updated_dict[col_name])
+            return True
+        except Exception as e:
+            st.error(f"Failed to update customer: {e}")
+            return False
+
+    def delete_customer_by_id(customer_id):
+        try:
+            ws = open_customer_sheet()
+            row_num, header = find_row_number_by_customerid(ws, customer_id)
+            if row_num is None:
+                st.error("CustomerID not found.")
+                return False
+            status_idx = None
+            for idx, col in enumerate(header, start=1):
+                if col.strip().lower() == "status":
+                    status_idx = idx
+                    break
+            if status_idx is None:
+                st.error("Status column not found on sheet.")
+                return False
+            ws.update_cell(row_num, status_idx, "Inactive")
+            return True
+        except Exception as e:
+            st.error(f"Failed to mark customer inactive: {e}")
+            return False
+
+    # ---------- UI: Add / List / Edit customers (no st.modal) ----------
     if "show_add_customer" not in st.session_state:
         st.session_state["show_add_customer"] = False
 
-    # ---------- Top bar: Title + Add button (toggles top form) ----------
     col1, col2 = st.columns([6, 1])
     with col1:
         st.markdown("### 📋 Customers")
     with col2:
         if st.button("➕ Add Customer"):
-            # toggle the add form open/close
             st.session_state["show_add_customer"] = not st.session_state["show_add_customer"]
 
-    # ---------- Add Customer inline popup (top) ----------
+    # Top inline add form (toggle)
     if st.session_state["show_add_customer"]:
         st.markdown("---")
         st.markdown("#### ➕ Create Customer Profile")
@@ -1045,7 +1170,6 @@ elif page == "Manage Customers":
                 ok = add_customer_row(row)
                 if ok:
                     st.success(f"Customer created: {customer_id}")
-                    # close form and refresh to show new record
                     st.session_state["show_add_customer"] = False
                     st.experimental_rerun()
                 else:
@@ -1054,27 +1178,25 @@ elif page == "Manage Customers":
             st.session_state["show_add_customer"] = False
             st.info("Create cancelled.")
 
-    # ---------- Load customers ----------
+    # Load and show customers
     df_customers = get_customers_df()
     if df_customers.empty:
         st.info("No customers found.")
         st.info("Make sure the Google Sheet is shared with the service account email (edit access).")
     else:
-        # Normalize expected columns & ordering
         expected_cols = ["CustomerID", "Name", "Phone", "Email", "DateOfJoining", "Shift", "Status", "Timestamp"]
         for col in expected_cols:
             if col not in df_customers.columns:
                 df_customers[col] = ""
         df_display = df_customers[expected_cols].copy()
 
-        # Small helper to ensure an edit flag exists for each customer
+        # prepare edit flags
         for cid in df_display["CustomerID"].astype(str).tolist():
             key = f"edit_{cid}"
             if key not in st.session_state:
                 st.session_state[key] = False
 
-        # Render heading row
-        st.markdown("")  # spacing
+        # header row
         header_cols = st.columns([2, 2, 2, 1])
         header_cols[0].markdown("**Customer / Name**")
         header_cols[1].markdown("**Contact (Phone / Email)**")
@@ -1082,7 +1204,6 @@ elif page == "Manage Customers":
         header_cols[3].markdown("**Actions**")
         st.markdown("---")
 
-        # Render each customer as a row with inline edit form toggled by button
         for i, row in df_display.iterrows():
             cid = str(row["CustomerID"]).strip()
             name = str(row["Name"])
@@ -1104,11 +1225,9 @@ elif page == "Manage Customers":
                 st.markdown(f"**DOJ:** {doj}  \n**Shift:** {shift}  \n**Status:** {status}")
 
             with col_actions:
-                # Edit toggle
                 if st.button("✏️", key=f"btn_edit_{cid}", help="Edit customer"):
                     st.session_state[f"edit_{cid}"] = not st.session_state[f"edit_{cid}"]
 
-                # Toggle Active/Inactive
                 toggle_label = "Deactivate" if status == "Active" else "Activate"
                 if st.button("↔️", key=f"btn_toggle_{cid}", help="Toggle Active/Inactive"):
                     new_status = "Inactive" if status == "Active" else "Active"
@@ -1119,7 +1238,6 @@ elif page == "Manage Customers":
                     else:
                         st.error("Failed to update status.")
 
-                # Delete (soft delete)
                 if st.button("🗑️", key=f"btn_del_{cid}", help="Mark Inactive"):
                     ok = delete_customer_by_id(cid)
                     if ok:
@@ -1128,7 +1246,7 @@ elif page == "Manage Customers":
                     else:
                         st.error("Failed to mark inactive.")
 
-            # Inline edit form (appears when flag True)
+            # Inline edit form
             if st.session_state.get(f"edit_{cid}", False):
                 st.markdown(f"**Editing {cid}**")
                 with st.form(f"edit_form_{cid}"):
@@ -1138,7 +1256,6 @@ elif page == "Manage Customers":
                         e_phone = st.text_input("Phone Number", value=row["Phone"], key=f"ephone_{cid}")
                     with e2:
                         e_email = st.text_input("Email", value=row["Email"], key=f"eemail_{cid}")
-                        # parse doj safely
                         try:
                             import datetime as _dt
                             doj_default = _dt.datetime.strptime(row["DateOfJoining"], "%Y-%m-%d").date() if row["DateOfJoining"] else _dt.date.today()
@@ -1171,8 +1288,8 @@ elif page == "Manage Customers":
                     st.session_state[f"edit_{cid}"] = False
                     st.info("Edit cancelled.")
 
-    # helpful notice
     st.info("Make sure the Google Sheet is shared with the service account email (edit access).")
+
 
 # ----------------------------
 # REFRESH BUTTON
