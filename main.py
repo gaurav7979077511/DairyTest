@@ -522,43 +522,80 @@ if page == "🏠 Dashboard":
                     "gradient": gradients["dist_evening"]
                 })
     
-        # Render cards in grid
+        # ---------- Render Cards in a Tight Flex Grid ----------
         if not missing_cards:
-            st.success("No missing actionable entries detected (from 2025-12-01).")
+            st.success("No pending entries detected.")
         else:
-            columns_per_row = 4
-            for i in range(0, len(missing_cards), columns_per_row):
-                row_cards = missing_cards[i:i + columns_per_row]
-                cols = st.columns(len(row_cards), gap="small")
-                for col, card in zip(cols, row_cards):
-                    if card["kind"] == "milking":
-                        # Milking & Feeding: title, CowID, bottom row date left & shift right
-                        html = (
-                            f'<a href="{card["url"]}" target="_blank" style="text-decoration:none;">'
-                            f'<div style="{BASE_CARD_STYLE} background:{card["gradient"]};">'
-                            f'<div style="{TITLE_STYLE}">Milking & Feeding</div>'
-                            f'<div style="{COWID_STYLE}">{card.get("cowid","")}</div>'
-                            f'<div style="{BOTTOM_ROW_STYLE}">'
-                            f'<div style="{DATE_STYLE}">{card["date"]}</div>'
-                            f'<div style="{PILL_STYLE}">{card["shift"]}</div>'
-                            f'</div>'
-                            f'</div>'
-                            f'</a>'
-                        )
+            st.markdown(
+                '<style>'
+                '.card-container { display:flex; flex-wrap:wrap; gap:12px; row-gap:16px; }'
+                '.card-item { flex:0 0 auto; }'
+                '</style>',
+                unsafe_allow_html=True
+            )
+        
+            st.markdown('<div class="card-container">', unsafe_allow_html=True)
+        
+            for card in missing_cards:
+        
+                # ---------------- Colors ----------------
+                if card["kind"] == "milking":
+                    gradient = "linear-gradient(135deg, #ff5f8d 0%, #ff8fb3 100%)"  # Pink
+                else:
+                    if card["shift"] == "Morning":
+                        gradient = "linear-gradient(135deg, #ffb300 0%, #ffd54f 100%)"  # Yellow
                     else:
-                        # Milk Distribution: title, date left & shift pill right (same row)
-                        html = (
-                            f'<a href="{card["url"]}" target="_blank" style="text-decoration:none;">'
-                            f'<div style="{BASE_CARD_STYLE} background:{card["gradient"]};">'
-                            f'<div style="{TITLE_STYLE}">Milk Distribution</div>'
-                            f'<div style="{BOTTOM_ROW_STYLE}">'
-                            f'<div style="{DATE_STYLE}">{card["date"]}</div>'
-                            f'<div style="{PILL_STYLE}">{card["shift"]}</div>'
-                            f'</div>'
-                            f'</div>'
-                            f'</a>'
-                        )
-                    col.markdown(html, unsafe_allow_html=True)
+                        gradient = "linear-gradient(135deg, #0091ff 0%, #4fb3ff 100%)"  # Blue
+        
+                # ---------- Build HTML safely ----------
+                if card["kind"] == "milking":
+                    html = (
+                        '<div class="card-item">'
+                        f'<a href="{card["url"]}" target="_blank" style="text-decoration:none;">'
+                        f'<div style="width:180px; padding:14px; border-radius:18px; '
+                        f'background:{gradient}; color:#ffffff; '
+                        'box-shadow:0 4px 12px rgba(0,0,0,0.25); '
+                        'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;">'
+        
+                        '<div style="font-size:12px; opacity:0.9;">Milking & Feeding</div>'
+        
+                        f'<div style="font-size:20px; font-weight:700; margin-top:4px;">{card["cowid"]}</div>'
+        
+                        '<div style="display:flex; justify-content:space-between; margin-top:6px;">'
+                        f'<div style="font-size:12px; font-weight:500;">{card["date"]}</div>'
+                        f'<div style="background:rgba(255,255,255,0.25); padding:4px 10px; border-radius:999px; '
+                        'font-size:12px; font-weight:600;">'
+                        f'{card["shift"]}</div>'
+                        '</div>'
+        
+                        '</div></a></div>'
+                    )
+                else:
+                    html = (
+                        '<div class="card-item">'
+                        f'<a href="{card["url"]}" target="_blank" style="text-decoration:none;">'
+                        f'<div style="width:180px; padding:14px; border-radius:18px; '
+                        f'background:{gradient}; color:#ffffff; '
+                        'box-shadow:0 4px 12px rgba(0,0,0,0.25); '
+                        'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;">'
+        
+                        '<div style="text-align:center; font-size:12px; opacity:0.9;">Milk Distribution</div>'
+        
+                        f'<div style="text-align:center; font-size:18px; font-weight:700; margin-top:6px;">{card["date"]}</div>'
+        
+                        '<div style="display:flex; justify-content:center; margin-top:8px;">'
+                        f'<div style="background:rgba(255,255,255,0.25); padding:4px 12px; border-radius:999px; '
+                        'font-size:12px; font-weight:600;">'
+                        f'{card["shift"]}</div>'
+                        '</div>'
+        
+                        '</div></a></div>'
+                    )
+        
+                st.markdown(html, unsafe_allow_html=True)
+        
+            st.markdown('</div>', unsafe_allow_html=True)
+
 
 
 # ----------------------------
