@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import urllib.parse
+import streamlit.components.v1 as components
 
 # ============================================================
 # PAGE CONFIGURATION
