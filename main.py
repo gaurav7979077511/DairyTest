@@ -1375,7 +1375,7 @@ elif page == "Milk Bitran":
         if not df_bitran.empty and "MilkDelivered" in df_bitran.columns:
             df_bitran["MilkDelivered"] = pd.to_numeric(
                 df_bitran["MilkDelivered"], errors="coerce"
-            ).fillna(0)
+            ).fillna(0).round(2)
     
             summary = (
                 df_bitran.groupby(["Date", "Shift"])["MilkDelivered"]
