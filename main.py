@@ -1122,7 +1122,6 @@ elif page == "Manage Customers":
             box-shadow:0 6px 16px rgba(0,0,0,0.25);
             line-height:1.3;
         ">
-            <div style="position:absolute;top:8px;right:10px;font-size:16px;">✏️</div>
 
             <div style="font-size:15px;font-weight:800;">👤 {row['Name']}</div>
             <div style="font-size:12px;">📞 {row['Phone']}</div>
