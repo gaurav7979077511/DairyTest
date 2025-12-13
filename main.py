@@ -1373,20 +1373,23 @@ elif page == "Milk Bitran":
         st.markdown("""
         <style>
         .card-grid {
-            display:grid;
-            grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
-            gap:16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
         }
         </style>
         """, unsafe_allow_html=True)
-
+        
         cards_html = '<div class="card-grid">'
+        
         for _, r in summary.iterrows():
+        
             gradient = (
-                "linear-gradient(135deg,#43cea2,#185a9d)"
+                "linear-gradient(135deg,#43cea2,#185a9d)"  # Morning
                 if r["Shift"] == "Morning"
-                else "linear-gradient(135deg,#7F00FF,#E100FF)"
+                else "linear-gradient(135deg,#7F00FF,#E100FF)"  # Evening
             )
+        
             cards_html += f"""
             <div style="
                 padding:14px;
@@ -1395,15 +1398,22 @@ elif page == "Milk Bitran":
                 color:white;
                 box-shadow:0 6px 16px rgba(0,0,0,0.25);
             ">
-                <div style="font-size:13px;opacity:0.9">{r['Date']}</div>
-                <div style="font-size:15px;font-weight:700">{r['Shift']}</div>
+                <div style="font-size:13px;opacity:0.9">
+                    {r['Date']}
+                </div>
+                <div style="font-size:15px;font-weight:700">
+                    {r['Shift']}
+                </div>
                 <div style="font-size:20px;font-weight:800">
-                    {round(r['MilkDelivered'],2)} L
+                    {round(r['MilkDelivered'], 2)} L
                 </div>
             </div>
             """
+        
         cards_html += "</div>"
+        
         st.markdown(cards_html, unsafe_allow_html=True)
+
 
     # ================= ENTRY FORM =================
     if st.session_state.show_form:
