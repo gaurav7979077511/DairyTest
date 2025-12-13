@@ -1209,7 +1209,7 @@ elif page == "Manage Customers":
     else:
         expected_cols = [
             "CustomerID", "Name", "Phone", "Email",
-            "DateOfJoining", "Shift", "Status", "Timestamp"
+            "DateOfJoining", "Shift", "Status"
         ]
     
         for col in expected_cols:
@@ -1218,16 +1218,13 @@ elif page == "Manage Customers":
     
         df_display = df_customers[expected_cols]
     
-        # Loop with index
         for i, row in df_display.iterrows():
     
-            # Create new row of columns every 4 cards
             if i % 4 == 0:
                 cols = st.columns(4)
     
             shift = str(row["Shift"]).strip()
     
-            # 🎨 Shift-based gradient
             if shift == "Morning":
                 gradient = "linear-gradient(135deg,#43cea2,#185a9d)"
             elif shift == "Evening":
@@ -1237,42 +1234,43 @@ elif page == "Manage Customers":
             else:
                 gradient = "linear-gradient(135deg,#757f9a,#d7dde8)"
     
+            card_html = f"""
+            <div style="
+                padding:16px;
+                border-radius:14px;
+                background:{gradient};
+                color:white;
+                box-shadow:0 6px 16px rgba(0,0,0,0.25);
+                font-family:inherit;
+            ">
+                <div style="font-size:16px;font-weight:800;">
+                    👤 {row['Name']}
+                </div>
+    
+                <div style="font-size:13px;opacity:0.9;margin-top:6px;">
+                    📞 {row['Phone']}
+                </div>
+    
+                <div style="font-size:13px;opacity:0.9;">
+                    ✉️ {row['Email']}
+                </div>
+    
+                <div style="font-size:13px;margin-top:8px;">
+                    🆔 {row['CustomerID']}
+                </div>
+    
+                <div style="font-size:13px;">
+                    📅 {row['DateOfJoining']}
+                </div>
+    
+                <div style="font-size:14px;font-weight:700;margin-top:6px;">
+                    ⏰ {row['Shift']} • {row['Status']}
+                </div>
+            </div>
+            """
+    
             with cols[i % 4]:
-                st.markdown(
-                    f"""
-                    <div style="
-                        padding:16px;
-                        margin:12px 0;
-                        border-radius:14px;
-                        background:{gradient};
-                        color:white;
-                        box-shadow:0 6px 16px rgba(0,0,0,0.25);
-                    ">
-                        <div style="font-size:16px;font-weight:800;">
-                            👤 {row['Name']}
-                        </div>
-    
-                        <div style="font-size:13px;opacity:0.9;margin-top:6px;">
-                            📞 {row['Phone']}
-                        </div>
-                        <div style="font-size:13px;opacity:0.9;">
-                            ✉️ {row['Email']}
-                        </div>
-    
-                        <div style="font-size:13px;margin-top:8px;">
-                            🆔 {row['CustomerID']}
-                        </div>
-                        <div style="font-size:13px;">
-                            📅 {row['DateOfJoining']}
-                        </div>
-    
-                        <div style="font-size:14px;font-weight:700;margin-top:6px;">
-                            ⏰ {row['Shift']} • {row['Status']}
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                components.html(card_html, height=260)
 
 
         # ----- Select Customer to Edit -----
