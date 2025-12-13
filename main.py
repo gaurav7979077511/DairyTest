@@ -1384,7 +1384,7 @@ elif page == "Milk Bitran":
                 st.markdown(
                     f"""
                     <div style="
-                        padding:14px 14px;
+                        padding:12px;
                         margin:12px 0;
                         border-radius:14px;
                         background:linear-gradient(135deg,#00c6ff,#0072ff);
