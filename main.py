@@ -1346,51 +1346,64 @@ elif page == "Milk Bitran":
         st.session_state.show_form = None
 
     col1, col2 = st.columns(2)
+    # ===================== SHIFT BUTTONS =====================
     with col1:
         if st.button("🌅 Morning Bitran", use_container_width=True):
             st.session_state.show_form = "Morning"
+    
     with col2:
         if st.button("🌃 Evening Bitran", use_container_width=True):
             st.session_state.show_form = "Evening"
-
-
-        # ================= SUMMARY CARDS =================
-        # ================= SUMMARY CARDS =================
-        df_bitran = load_bitran_data()
-
-        if not df_bitran.empty and "MilkDelivered" in df_bitran.columns:
-            df_bitran["MilkDelivered"] = pd.to_numeric(
-                df_bitran["MilkDelivered"], errors="coerce"
-            ).fillna(0).round(2)
     
-            summary = (
-                df_bitran.groupby(["Date", "Shift"])["MilkDelivered"]
-                .sum()
-                .reset_index()
-                .sort_values("Date", ascending=False)
-            )
     
-            st.subheader("📊 Daily Summary")
+    # ===================== SUMMARY CARDS =====================
+    df_bitran = load_bitran_data()
     
-            cols = st.columns(4)
-            for i, row in summary.iterrows():
-                with cols[i % 4]:
-                    st.markdown(
-                        f"""
-                        <div style="
-                            padding:14px;
-                            border-radius:14px;
-                            background:linear-gradient(135deg,#00c6ff,#0072ff);
-                            color:white;
-                            box-shadow:0 6px 16px rgba(0,0,0,0.25);
-                        ">
-                            <div style="font-size:13px;opacity:0.9">{row['Date']}</div>
-                            <div style="font-size:15px;font-weight:700">{row['Shift']}</div>
-                            <div style="font-size:20px;font-weight:800">{row['MilkDelivered']} L</div>
+    if not df_bitran.empty and "MilkDelivered" in df_bitran.columns:
+    
+        df_bitran["MilkDelivered"] = (
+            pd.to_numeric(df_bitran["MilkDelivered"], errors="coerce")
+            .fillna(0)
+            .round(2)
+        )
+    
+        summary = (
+            df_bitran
+            .groupby(["Date", "Shift"])["MilkDelivered"]
+            .sum()
+            .reset_index()
+            .sort_values("Date", ascending=False)
+        )
+    
+        st.subheader("📊 Daily Summary")
+    
+        cols = st.columns(4)
+    
+        for i, row in summary.iterrows():
+            with cols[i % 4]:
+                st.markdown(
+                    f"""
+                    <div style="
+                        padding:14px;
+                        border-radius:14px;
+                        background:linear-gradient(135deg,#00c6ff,#0072ff);
+                        color:white;
+                        box-shadow:0 6px 16px rgba(0,0,0,0.25);
+                    ">
+                        <div style="font-size:13px;opacity:0.9">
+                            {row['Date']}
                         </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+                        <div style="font-size:15px;font-weight:700">
+                            {row['Shift']}
+                        </div>
+                        <div style="font-size:20px;font-weight:800">
+                            {row['MilkDelivered']} L
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
 
     # ================= ENTRY FORM =================
     if st.session_state.show_form:
