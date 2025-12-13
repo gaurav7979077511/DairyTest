@@ -1218,12 +1218,15 @@ elif page == "Manage Customers":
     
         df_display = df_customers[expected_cols]
     
-        cols = st.columns(4)
-
+        # Loop with index
         for i, row in df_display.iterrows():
-        
+    
+            # Create new row of columns every 4 cards
+            if i % 4 == 0:
+                cols = st.columns(4)
+    
             shift = str(row["Shift"]).strip()
-        
+    
             # 🎨 Shift-based gradient
             if shift == "Morning":
                 gradient = "linear-gradient(135deg,#43cea2,#185a9d)"
@@ -1233,7 +1236,7 @@ elif page == "Manage Customers":
                 gradient = "linear-gradient(135deg,#f7971e,#ffd200)"
             else:
                 gradient = "linear-gradient(135deg,#757f9a,#d7dde8)"
-        
+    
             with cols[i % 4]:
                 st.markdown(
                     f"""
@@ -1248,21 +1251,21 @@ elif page == "Manage Customers":
                         <div style="font-size:16px;font-weight:800;">
                             👤 {row['Name']}
                         </div>
-        
+    
                         <div style="font-size:13px;opacity:0.9;margin-top:6px;">
                             📞 {row['Phone']}
                         </div>
                         <div style="font-size:13px;opacity:0.9;">
                             ✉️ {row['Email']}
                         </div>
-        
+    
                         <div style="font-size:13px;margin-top:8px;">
                             🆔 {row['CustomerID']}
                         </div>
                         <div style="font-size:13px;">
                             📅 {row['DateOfJoining']}
                         </div>
-        
+    
                         <div style="font-size:14px;font-weight:700;margin-top:6px;">
                             ⏰ {row['Shift']} • {row['Status']}
                         </div>
@@ -1270,7 +1273,6 @@ elif page == "Manage Customers":
                     """,
                     unsafe_allow_html=True,
                 )
-
 
 
         # ----- Select Customer to Edit -----
