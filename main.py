@@ -1369,18 +1369,16 @@ elif page == "Milk Bitran":
         )
 
         st.subheader("📊 Daily Summary")
-        
+
         if df_bitran.empty:
             st.info("No Bitran data available.")
         else:
-            # Ensure numeric + rounding
             df_bitran["MilkDelivered"] = (
                 pd.to_numeric(df_bitran["MilkDelivered"], errors="coerce")
                 .fillna(0)
                 .round(2)
             )
         
-            # Aggregate per Date + Shift
             summary_df = (
                 df_bitran
                 .groupby(["Date", "Shift"], as_index=False)["MilkDelivered"]
@@ -1388,7 +1386,6 @@ elif page == "Milk Bitran":
                 .sort_values(["Date", "Shift"], ascending=[False, True])
             )
         
-            # -------- BUILD HTML ONCE --------
             cards_html = """
             <style>
                 .summary-container {
@@ -1431,10 +1428,9 @@ elif page == "Milk Bitran":
             """
         
             for _, row in summary_df.iterrows():
-                shift_class = "morning" if row["Shift"].lower() == "morning" else "evening"
-        
+                cls = "morning" if row["Shift"].lower() == "morning" else "evening"
                 cards_html += f"""
-                <div class="summary-card {shift_class}">
+                <div class="summary-card {cls}">
                     <div class="date">{row['Date']}</div>
                     <div class="shift">{row['Shift']}</div>
                     <div class="liters">{row['MilkDelivered']:.2f} L</div>
@@ -1443,7 +1439,7 @@ elif page == "Milk Bitran":
         
             cards_html += "</div>"
         
-            # 🔥 Render ONCE
+            # 🔥 THIS LINE IS CRITICAL
             st.markdown(cards_html, unsafe_allow_html=True)
 
 
