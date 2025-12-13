@@ -1380,14 +1380,21 @@ elif page == "Milk Bitran":
         cols = st.columns(4)
     
         for i, row in summary.iterrows():
+
+            # 🎨 Gradient based on shift
+            if row["Shift"] == "Morning":
+                gradient = "linear-gradient(135deg,#43cea2,#185a9d)"
+            else:  # Evening
+                gradient = "linear-gradient(135deg,#7F00FF,#E100FF)"
+        
             with cols[i % 4]:
                 st.markdown(
                     f"""
                     <div style="
-                        padding:12px;
+                        padding:16px;
                         margin:12px 0;
                         border-radius:14px;
-                        background:linear-gradient(135deg,#00c6ff,#0072ff);
+                        background:{gradient};
                         color:white;
                         box-shadow:0 6px 16px rgba(0,0,0,0.25);
                     ">
@@ -1404,6 +1411,7 @@ elif page == "Milk Bitran":
                     """,
                     unsafe_allow_html=True,
                 )
+
 
 
 
