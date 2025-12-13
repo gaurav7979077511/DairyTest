@@ -1353,20 +1353,6 @@ elif page == "Milk Bitran":
         if st.button("🌃 Evening Bitran", use_container_width=True):
             st.session_state.show_form = "Evening"
 
-    # ================= SUMMARY CARDS =================
-    df_bitran = load_bitran_data()
-
-    if not df_bitran.empty:
-        df_bitran["MilkDelivered"] = pd.to_numeric(
-            df_bitran["MilkDelivered"], errors="coerce"
-        ).fillna(0)
-
-        summary = (
-            df_bitran.groupby(["Date", "Shift"])["MilkDelivered"]
-            .sum()
-            .reset_index()
-            .sort_values("Date", ascending=False)
-        )
 
         # ================= SUMMARY CARDS =================
         # ================= SUMMARY CARDS =================
