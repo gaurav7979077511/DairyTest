@@ -1236,43 +1236,44 @@ elif page == "Manage Customers":
                 gradient = "linear-gradient(135deg,#757f9a,#d7dde8)"
     
             card_html = f"""
-            <div style="
-                padding:16px;
-                margin:4px 0;
-                border-radius:14px;
-                background:{gradient};
-                color:white;
-                box-shadow:0 6px 16px rgba(0,0,0,0.25);
-                font-family:inherit;
-            ">
-                <div style="font-size:16px;font-weight:800;">
-                    👤 {row['Name']}
+                <div style="
+                    padding:12px;
+                    border-radius:14px;
+                    background:{gradient};
+                    color:white;
+                    box-shadow:0 6px 16px rgba(0,0,0,0.25);
+                    font-family:inherit;
+                    line-height:1.3;
+                ">
+                    <div style="font-size:15px;font-weight:800;margin-bottom:4px;">
+                        👤 {row['Name']}
+                    </div>
+                
+                    <div style="font-size:12px;opacity:0.9;">
+                        📞 {row['Phone']}
+                    </div>
+                
+                    <div style="font-size:12px;opacity:0.9;">
+                        ✉️ {row['Email']}
+                    </div>
+                
+                    <div style="font-size:12px;margin-top:6px;">
+                        🆔 {row['CustomerID']}
+                    </div>
+                
+                    <div style="font-size:12px;">
+                        📅 {row['DateOfJoining']}
+                    </div>
+                
+                    <div style="font-size:13px;font-weight:700;margin-top:6px;">
+                        ⏰ {row['Shift']} • {row['Status']}
+                    </div>
                 </div>
-    
-                <div style="font-size:13px;opacity:0.9;margin-top:6px;">
-                    📞 {row['Phone']}
-                </div>
-    
-                <div style="font-size:13px;opacity:0.9;">
-                    ✉️ {row['Email']}
-                </div>
-    
-                <div style="font-size:13px;margin-top:8px;">
-                    🆔 {row['CustomerID']}
-                </div>
-    
-                <div style="font-size:13px;">
-                    📅 {row['DateOfJoining']}
-                </div>
-    
-                <div style="font-size:14px;font-weight:700;margin-top:6px;">
-                    ⏰ {row['Shift']} • {row['Status']}
-                </div>
-            </div>
-            """
+                """
+
     
             with cols[i % 4]:
-                components.html(card_html, height=260)
+                components.html(card_html, height=200)
 
         # ----- Select Customer to Edit -----
         options = df_display.apply(lambda r: f"{r['CustomerID']} | {r['Name']}", axis=1).tolist()
