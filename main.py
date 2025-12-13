@@ -1368,8 +1368,6 @@ elif page == "Milk Bitran":
             .sort_values("Date", ascending=False)
         )
 
-        st.subheader("📊 Daily Summary")
-
         # ================= SUMMARY CARDS =================
         df_bitran = load_bitran_data()
         
