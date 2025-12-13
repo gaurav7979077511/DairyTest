@@ -67,6 +67,7 @@ page = st.sidebar.radio(
         "Payments",
         "Investments",
         "Manage Customers",
+         "Create Customer Profile",
     ],
 )
 
