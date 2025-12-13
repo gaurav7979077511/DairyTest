@@ -998,6 +998,10 @@ elif page == "Manage Customers":
         unsafe_allow_html=True
     )
 
+    if st.button("➕ Add New Customer"):
+        st.switch_page("Create Customer Profile")
+
+
 
     # ---------- CONFIG ----------
     # Prefer sheet id from secrets; fallback to the id you provided earlier
