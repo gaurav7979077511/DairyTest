@@ -1364,7 +1364,6 @@ elif page == "Milk Bitran":
         df_bitran["MilkDelivered"] = (
             pd.to_numeric(df_bitran["MilkDelivered"], errors="coerce")
             .fillna(0)
-            .round(2)
         )
     
         summary = (
@@ -1374,6 +1373,7 @@ elif page == "Milk Bitran":
             .reset_index()
             .sort_values("Date", ascending=False)
         )
+        summary["MilkDelivered"] = summary["MilkDelivered"].round(2)
     
         st.subheader("📊 Daily Summary")
     
