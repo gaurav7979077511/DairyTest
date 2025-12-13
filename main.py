@@ -992,7 +992,6 @@ elif page == "Manage Customers":
 
     import streamlit as st
     import pandas as pd
-    import streamlit.components.v1 as components
     import datetime as dt
 
     st.title("👥 Manage Customers")
@@ -1045,8 +1044,8 @@ elif page == "Manage Customers":
         ws = open_customer_sheet()
         rows = ws.get_all_values()
         header = rows[0]
-
         id_col = header.index("CustomerID")
+
         for i, r in enumerate(rows[1:], start=2):
             if r[id_col] == customer_id:
                 for k, v in updated.items():
@@ -1105,76 +1104,54 @@ elif page == "Manage Customers":
         if i % 4 == 0:
             cols = st.columns(4)
 
-        shift = row["Shift"]
         gradient = {
             "Morning": "linear-gradient(135deg,#43cea2,#185a9d)",
             "Evening": "linear-gradient(135deg,#7F00FF,#E100FF)",
             "Both": "linear-gradient(135deg,#f7971e,#ffd200)"
-        }.get(shift, "linear-gradient(135deg,#757f9a,#d7dde8)")
-
-        card_html = f"""
-        <div style="
-            position:relative;
-            padding:12px;
-            border-radius:14px;
-            background:{gradient};
-            color:white;
-            box-shadow:0 6px 16px rgba(0,0,0,0.25);
-            line-height:1.3;
-        ">
-
-            <div style="font-size:15px;font-weight:800;">👤 {row['Name']}</div>
-            <div style="font-size:12px;">📞 {row['Phone']}</div>
-            <div style="font-size:12px;">✉️ {row['Email']}</div>
-            <div style="font-size:12px;">🆔 {row['CustomerID']}</div>
-            <div style="font-size:12px;">📅 {row['DateOfJoining']}</div>
-            <div style="font-size:13px;font-weight:700;">
-                ⏰ {row['Shift']} • {row['Status']}
-            </div>
-        </div>
-        """
+        }.get(row["Shift"], "linear-gradient(135deg,#757f9a,#d7dde8)")
 
         with cols[i % 4]:
 
-            # Wrapper
+            # ---------- CARD WITH EDIT ICON INSIDE ----------
             st.markdown(
-                """
-                <style>
-                .card-wrapper {
-                    position: relative;
-                }
-                .edit-btn button {
-                    position: absolute;
-                    top: 8px;
-                    right: 8px;
-                    background: transparent;
-                    border: none;
-                    font-size: 16px;
-                    cursor: pointer;
-                    padding: 0;
-                }
-                .edit-btn button:hover {
-                    transform: scale(1.1);
-                }
-                </style>
+                f"""
+                <div style="
+                    position:relative;
+                    padding:12px;
+                    border-radius:14px;
+                    background:{gradient};
+                    color:white;
+                    box-shadow:0 6px 16px rgba(0,0,0,0.25);
+                    line-height:1.3;
+                ">
+
+                    <div style="
+                        position:absolute;
+                        top:8px;
+                        right:8px;
+                        font-size:16px;
+                        cursor:pointer;
+                    ">
+                        ✏️
+                    </div>
+
+                    <div style="font-size:15px;font-weight:800;">👤 {row['Name']}</div>
+                    <div style="font-size:12px;">📞 {row['Phone']}</div>
+                    <div style="font-size:12px;">✉️ {row['Email']}</div>
+                    <div style="font-size:12px;">🆔 {row['CustomerID']}</div>
+                    <div style="font-size:12px;">📅 {row['DateOfJoining']}</div>
+                    <div style="font-size:13px;font-weight:700;">
+                        ⏰ {row['Shift']} • {row['Status']}
+                    </div>
+                </div>
                 """,
-                unsafe_allow_html=True,
+                unsafe_allow_html=True
             )
-        
-            st.markdown('<div class="card-wrapper">', unsafe_allow_html=True)
-        
-            # Card HTML
-            components.html(card_html, height=150)
-        
-            # REAL clickable edit icon (Streamlit button)
-            st.markdown('<div class="edit-btn">', unsafe_allow_html=True)
+
+            # ---------- REAL CLICK HANDLER ----------
             if st.button("✏️", key=f"edit_{row['CustomerID']}"):
                 st.session_state.edit_customer_id = row["CustomerID"]
                 st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-            st.markdown('</div>', unsafe_allow_html=True)
-
 
             # ---------- INLINE EDIT FORM ----------
             if st.session_state.edit_customer_id == row["CustomerID"]:
@@ -1187,7 +1164,7 @@ elif page == "Manage Customers":
                     with e2:
                         e_email = st.text_input("Email", row["Email"])
                         e_doj = st.date_input(
-                            "DOJ",
+                            "Date of Joining",
                             pd.to_datetime(row["DateOfJoining"]).date()
                         )
                     with e3:
@@ -1225,6 +1202,7 @@ elif page == "Manage Customers":
                     st.success("Customer updated")
                     st.session_state.edit_customer_id = None
                     st.rerun()
+
 
 elif page == "Milk Bitran":
 
