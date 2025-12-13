@@ -1384,7 +1384,7 @@ elif page == "Milk Bitran":
                 st.markdown(
                     f"""
                     <div style="
-                        padding: top-bottom left-right;
+                        padding:14px 14px;
                         border-radius:14px;
                         background:linear-gradient(135deg,#00c6ff,#0072ff);
                         color:white;
@@ -1397,12 +1397,13 @@ elif page == "Milk Bitran":
                             {row['Shift']}
                         </div>
                         <div style="font-size:20px;font-weight:800">
-                            {row['MilkDelivered']} L
+                            {row['MilkDelivered']:.2f} L
                         </div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
+
 
 
     # ================= ENTRY FORM =================
