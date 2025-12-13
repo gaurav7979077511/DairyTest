@@ -1369,6 +1369,7 @@ elif page == "Milk Bitran":
         )
 
         # ================= SUMMARY CARDS =================
+        # ================= SUMMARY CARDS =================
         df_bitran = load_bitran_data()
         
         if not df_bitran.empty:
@@ -1389,10 +1390,8 @@ elif page == "Milk Bitran":
             st.subheader("📊 Daily Summary")
         
             card_blocks = []
-        
             for _, row in summary_df.iterrows():
                 cls = "morning" if row["Shift"].lower() == "morning" else "evening"
-        
                 card_blocks.append(
                     f"""
                     <div class="summary-card {cls}">
@@ -1448,11 +1447,14 @@ elif page == "Milk Bitran":
         </style>
         
         <div class="summary-container">
-            {''.join(card_blocks)}
+        {''.join(card_blocks)}
         </div>
         """
         
-            st.markdown(summary_html, unsafe_allow_html=True)
+            summary_container = st.container()
+            with summary_container:
+                st.markdown(summary_html, unsafe_allow_html=True)
+        
         else:
             st.info("No Bitran data available.")
 
