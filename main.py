@@ -1369,54 +1369,82 @@ elif page == "Milk Bitran":
         )
 
         st.subheader("📊 Daily Summary")
-
-        # ---------- GRID CSS ----------
-        st.markdown("""
-        <style>
-        .card-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 16px;
-        }
-        </style>
-        """, unsafe_allow_html=True)
         
-        # ---------- BUILD HTML ----------
-        cards_html = '<div class="card-grid">'
-        
-        for _, r in summary.iterrows():
-        
-            gradient = (
-                "linear-gradient(135deg,#43cea2,#185a9d)"   # Morning
-                if r["Shift"] == "Morning"
-                else "linear-gradient(135deg,#7F00FF,#E100FF)"  # Evening
+        if df_bitran.empty:
+            st.info("No Bitran data available.")
+        else:
+            # Ensure numeric + rounding
+            df_bitran["MilkDelivered"] = (
+                pd.to_numeric(df_bitran["MilkDelivered"], errors="coerce")
+                .fillna(0)
+                .round(2)
             )
         
-            cards_html += f"""
-            <div style="
-                padding:14px;
-                border-radius:14px;
-                background:{gradient};
-                color:white;
-                box-shadow:0 6px 16px rgba(0,0,0,0.25);
-            ">
-                <div style="font-size:13px;opacity:0.9">
-                    {r['Date']}
-                </div>
-                <div style="font-size:15px;font-weight:700">
-                    {r['Shift']}
-                </div>
-                <div style="font-size:20px;font-weight:800">
-                    {round(float(r['MilkDelivered']), 2)} L
-                </div>
-            </div>
+            # Aggregate per Date + Shift
+            summary_df = (
+                df_bitran
+                .groupby(["Date", "Shift"], as_index=False)["MilkDelivered"]
+                .sum()
+                .sort_values(["Date", "Shift"], ascending=[False, True])
+            )
+        
+            # -------- BUILD HTML ONCE --------
+            cards_html = """
+            <style>
+                .summary-container {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 16px;
+                    margin-top: 12px;
+                }
+                .summary-card {
+                    width: 220px;
+                    padding: 14px;
+                    border-radius: 14px;
+                    color: white;
+                    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+                    font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;
+                }
+                .morning {
+                    background: linear-gradient(135deg,#43cea2,#185a9d);
+                }
+                .evening {
+                    background: linear-gradient(135deg,#7F00FF,#E100FF);
+                }
+                .date {
+                    font-size: 13px;
+                    opacity: 0.9;
+                }
+                .shift {
+                    font-size: 15px;
+                    font-weight: 700;
+                    margin-top: 4px;
+                }
+                .liters {
+                    font-size: 20px;
+                    font-weight: 800;
+                    margin-top: 6px;
+                }
+            </style>
+        
+            <div class="summary-container">
             """
         
-        cards_html += "</div>"
+            for _, row in summary_df.iterrows():
+                shift_class = "morning" if row["Shift"].lower() == "morning" else "evening"
         
-        # ---------- RENDER ----------
-        st.markdown(cards_html, unsafe_allow_html=True)
+                cards_html += f"""
+                <div class="summary-card {shift_class}">
+                    <div class="date">{row['Date']}</div>
+                    <div class="shift">{row['Shift']}</div>
+                    <div class="liters">{row['MilkDelivered']:.2f} L</div>
+                </div>
+                """
         
+            cards_html += "</div>"
+        
+            # 🔥 Render ONCE
+            st.markdown(cards_html, unsafe_allow_html=True)
 
 
     # ================= ENTRY FORM =================
