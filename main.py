@@ -1135,11 +1135,46 @@ elif page == "Manage Customers":
         """
 
         with cols[i % 4]:
-            components.html(card_html, height=150)
 
+            # Wrapper
+            st.markdown(
+                """
+                <style>
+                .card-wrapper {
+                    position: relative;
+                }
+                .edit-btn button {
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
+                    background: transparent;
+                    border: none;
+                    font-size: 16px;
+                    cursor: pointer;
+                    padding: 0;
+                }
+                .edit-btn button:hover {
+                    transform: scale(1.1);
+                }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
+        
+            st.markdown('<div class="card-wrapper">', unsafe_allow_html=True)
+        
+            # Card HTML
+            components.html(card_html, height=150)
+        
+            # REAL clickable edit icon (Streamlit button)
+            st.markdown('<div class="edit-btn">', unsafe_allow_html=True)
             if st.button("✏️", key=f"edit_{row['CustomerID']}"):
                 st.session_state.edit_customer_id = row["CustomerID"]
                 st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+            st.markdown('</div>', unsafe_allow_html=True)
+
 
             # ---------- INLINE EDIT FORM ----------
             if st.session_state.edit_customer_id == row["CustomerID"]:
