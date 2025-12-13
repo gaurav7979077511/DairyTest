@@ -1371,94 +1371,40 @@ elif page == "Milk Bitran":
         # ================= SUMMARY CARDS =================
         # ================= SUMMARY CARDS =================
         df_bitran = load_bitran_data()
-        
-        if not df_bitran.empty:
-        
-            df_bitran["MilkDelivered"] = (
-                pd.to_numeric(df_bitran["MilkDelivered"], errors="coerce")
-                .fillna(0)
-                .round(2)
-            )
-        
-            summary_df = (
-                df_bitran
-                .groupby(["Date", "Shift"], as_index=False)["MilkDelivered"]
+
+        if not df_bitran.empty and "MilkDelivered" in df_bitran.columns:
+            df_bitran["MilkDelivered"] = pd.to_numeric(
+                df_bitran["MilkDelivered"], errors="coerce"
+            ).fillna(0)
+    
+            summary = (
+                df_bitran.groupby(["Date", "Shift"])["MilkDelivered"]
                 .sum()
-                .sort_values(["Date", "Shift"], ascending=[False, True])
+                .reset_index()
+                .sort_values("Date", ascending=False)
             )
-        
+    
             st.subheader("📊 Daily Summary")
-        
-            card_blocks = []
-            for _, row in summary_df.iterrows():
-                cls = "morning" if row["Shift"].lower() == "morning" else "evening"
-                card_blocks.append(
-                    f"""
-                    <div class="summary-card {cls}">
-                        <div class="date">{row['Date']}</div>
-                        <div class="shift">{row['Shift']}</div>
-                        <div class="liters">{row['MilkDelivered']:.2f} L</div>
-                    </div>
-                    """
-                )
-        
-            summary_html = f"""
-        <style>
-        .summary-container {{
-            display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
-            margin-top: 12px;
-        }}
-        
-        .summary-card {{
-            width: 220px;
-            padding: 14px;
-            border-radius: 14px;
-            color: white;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.25);
-            font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;
-        }}
-        
-        .summary-card.morning {{
-            background: linear-gradient(135deg,#43cea2,#185a9d);
-        }}
-        
-        .summary-card.evening {{
-            background: linear-gradient(135deg,#7F00FF,#E100FF);
-        }}
-        
-        .date {{
-            font-size: 13px;
-            opacity: 0.9;
-        }}
-        
-        .shift {{
-            font-size: 15px;
-            font-weight: 700;
-            margin-top: 4px;
-        }}
-        
-        .liters {{
-            font-size: 20px;
-            font-weight: 800;
-            margin-top: 6px;
-        }}
-        </style>
-        
-        <div class="summary-container">
-        {''.join(card_blocks)}
-        </div>
-        """
-        
-            summary_container = st.container()
-            with summary_container:
-                st.markdown(summary_html, unsafe_allow_html=True)
-        
-        else:
-            st.info("No Bitran data available.")
-
-
+    
+            cols = st.columns(4)
+            for i, row in summary.iterrows():
+                with cols[i % 4]:
+                    st.markdown(
+                        f"""
+                        <div style="
+                            padding:14px;
+                            border-radius:14px;
+                            background:linear-gradient(135deg,#00c6ff,#0072ff);
+                            color:white;
+                            box-shadow:0 6px 16px rgba(0,0,0,0.25);
+                        ">
+                            <div style="font-size:13px;opacity:0.9">{row['Date']}</div>
+                            <div style="font-size:15px;font-weight:700">{row['Shift']}</div>
+                            <div style="font-size:20px;font-weight:800">{row['MilkDelivered']} L</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
     # ================= ENTRY FORM =================
     if st.session_state.show_form:
