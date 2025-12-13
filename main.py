@@ -1199,24 +1199,78 @@ elif page == "Manage Customers":
                 else:
                     st.error("Failed to add customer.")
 
-    # ---------- CUSTOMER TABLE ----------
+    # ---------- CUSTOMER CARDS ----------
     st.markdown("### 📋 Customers List")
-
+    
     df_customers = get_customers_df()
-
+    
     if df_customers.empty:
         st.info("No customers found.")
     else:
-        expected_cols = ["CustomerID", "Name", "Phone", "Email",
-                         "DateOfJoining", "Shift", "Status", "Timestamp"]
-
+        expected_cols = [
+            "CustomerID", "Name", "Phone", "Email",
+            "DateOfJoining", "Shift", "Status", "Timestamp"
+        ]
+    
         for col in expected_cols:
             if col not in df_customers.columns:
                 df_customers[col] = ""
-
+    
         df_display = df_customers[expected_cols]
+    
+        cols = st.columns(4)
+        for i, row in df_display.iterrows():
+        
+            shift = str(row["Shift"]).strip()
+        
+            # 🎨 Shift-based gradient (Morning / Evening / Both)
+            if shift == "Morning":
+                gradient = "linear-gradient(135deg,#43cea2,#185a9d)"
+            elif shift == "Evening":
+                gradient = "linear-gradient(135deg,#7F00FF,#E100FF)"
+            elif shift == "Both":
+                gradient = "linear-gradient(135deg,#f7971e,#ffd200)"
+            else:
+                gradient = "linear-gradient(135deg,#757f9a,#d7dde8)"
+        
+            with cols[i % 4]:
+                st.markdown(
+                    f"""
+                    <div style="
+                        padding:18px;
+                        margin:14px 0;
+                        border-radius:16px;
+                        background:{gradient};
+                        color:white;
+                        box-shadow:0 8px 20px rgba(0,0,0,0.3);
+                    ">
+                        <div style="font-size:18px;font-weight:800;">
+                            👤 {row['Name']}
+                        </div>
+        
+                        <div style="font-size:13px;opacity:0.9;margin-top:6px;">
+                            📞 {row['Phone']}
+                        </div>
+                        <div style="font-size:13px;opacity:0.9;">
+                            ✉️ {row['Email']}
+                        </div>
+        
+                        <hr style="border:0;border-top:1px solid rgba(255,255,255,0.35);margin:10px 0;">
+        
+                        <div style="font-size:13px;">
+                            🆔 <b>{row['CustomerID']}</b>
+                        </div>
+                        <div style="font-size:13px;">
+                            📅 Joined: {row['DateOfJoining']}
+                        </div>
+                        <div style="font-size:13px;font-weight:600;">
+                            ⏰ {row['Shift']} • {row['Status']}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
-        st.dataframe(df_display, use_container_width=True)
 
         # ----- Select Customer to Edit -----
         options = df_display.apply(lambda r: f"{r['CustomerID']} | {r['Name']}", axis=1).tolist()
