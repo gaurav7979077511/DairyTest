@@ -1370,6 +1370,7 @@ elif page == "Milk Bitran":
 
         st.subheader("📊 Daily Summary")
 
+        # ---------- GRID CSS ----------
         st.markdown("""
         <style>
         .card-grid {
@@ -1380,12 +1381,13 @@ elif page == "Milk Bitran":
         </style>
         """, unsafe_allow_html=True)
         
+        # ---------- BUILD HTML ----------
         cards_html = '<div class="card-grid">'
         
         for _, r in summary.iterrows():
         
             gradient = (
-                "linear-gradient(135deg,#43cea2,#185a9d)"  # Morning
+                "linear-gradient(135deg,#43cea2,#185a9d)"   # Morning
                 if r["Shift"] == "Morning"
                 else "linear-gradient(135deg,#7F00FF,#E100FF)"  # Evening
             )
@@ -1405,14 +1407,16 @@ elif page == "Milk Bitran":
                     {r['Shift']}
                 </div>
                 <div style="font-size:20px;font-weight:800">
-                    {round(r['MilkDelivered'], 2)} L
+                    {round(float(r['MilkDelivered']), 2)} L
                 </div>
             </div>
             """
         
         cards_html += "</div>"
         
+        # ---------- RENDER ----------
         st.markdown(cards_html, unsafe_allow_html=True)
+        
 
 
     # ================= ENTRY FORM =================
