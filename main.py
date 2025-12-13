@@ -1238,7 +1238,7 @@ elif page == "Manage Customers":
             card_html = f"""
             <div style="
                 padding:16px;
-                margin:12px 0;
+                margin:4px 0;
                 border-radius:14px;
                 background:{gradient};
                 color:white;
