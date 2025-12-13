@@ -990,6 +990,15 @@ elif page == "Manage Customers":
 
     st.title("👥 Manage Customers")
 
+    st.markdown(
+        '<a href="/?page=Create Customer Profile">'
+        '<button style="background-color:#4CAF50; color:white; padding:8px 20px; '
+        'border:none; border-radius:5px; font-size:16px;">➕ Add New Customer</button>'
+        '</a>',
+        unsafe_allow_html=True
+    )
+
+
     # ---------- CONFIG ----------
     # Prefer sheet id from secrets; fallback to the id you provided earlier
     CUSTOMER_SHEET_ID = st.secrets.get("sheets", {}).get(
@@ -1292,6 +1301,110 @@ elif page == "Manage Customers":
 
     st.info("Make sure the Google Sheet is shared with the service account email (edit access).")
 
+# -----------------------------------------------
+# PAGE: Create Customer Profile  (NEW PAGE)
+# -----------------------------------------------
+elif page == "Create Customer Profile":
+
+    st.title("➕ Create Customer Profile")
+
+    # ---------- CONFIG ----------
+    CUSTOMER_SHEET_ID = st.secrets.get("sheets", {}).get(
+        "CUSTOMER_SHEET_ID",
+        "13n7il7rrEHQ2kek1tIf1W2p0VdepfTkerfu1IeSe8Yc"
+    )
+    CUSTOMER_SHEET_TAB = "Sheet1"
+
+    # ---- IMPORT SAME FUNCTIONS FROM MANAGE PAGE ----
+    # You MUST reuse: init_gsheets(), open_customer_sheet(), ensure_header(), add_customer_row()
+
+    def init_gsheets():
+        import gspread
+        from oauth2client.service_account import ServiceAccountCredentials
+        
+        sa_dict = dict(st.secrets.get("gcp_service_account", {}))
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(sa_dict, scopes=scope)
+        return gspread.authorize(creds)
+
+    def open_customer_sheet():
+        client = init_gsheets()
+        sh = client.open_by_key(CUSTOMER_SHEET_ID)
+        try:
+            return sh.worksheet(CUSTOMER_SHEET_TAB)
+        except:
+            return sh.get_worksheet(0)
+
+    def ensure_header(ws):
+        header = ws.row_values(1)
+        if not header:
+            header = ["CustomerID", "Name", "Phone", "Email",
+                      "DateOfJoining", "Shift", "Status", "Timestamp"]
+            ws.insert_row(header, index=1)
+        return header
+
+    def add_customer_row(row_dict):
+        ws = open_customer_sheet()
+        header = ensure_header(ws)
+        row = [row_dict.get(h, "") for h in header]
+        ws.append_row(row, value_input_option="USER_ENTERED")
+        return True
+
+    # ------------------------------------------
+    #      FORM STARTS HERE
+    # ------------------------------------------
+
+    with st.form("create_customer_form_page"):
+        c1, c2, c3 = st.columns([3, 3, 2])
+
+        with c1:
+            name = st.text_input("Customer Name")
+            phone = st.text_input("Phone Number")
+
+        with c2:
+            email = st.text_input("Email")
+            doj = st.date_input("Date of Joining")
+
+        with c3:
+            shift = st.selectbox("Shift of Milk", ["Morning", "Evening", "Both"])
+            status = st.selectbox("Status", ["Active", "Inactive"])
+
+        colA, colB = st.columns(2)
+
+        with colA:
+            create_btn = st.form_submit_button("Create Customer")
+
+        with colB:
+            cancel_btn = st.form_submit_button("Cancel")
+
+    # ---------- FORM ACTIONS ----------
+    if create_btn:
+        if not name.strip():
+            st.error("Customer name is required.")
+        else:
+            import datetime as _dt
+            ts = _dt.datetime.now().strftime("%Y%m%d%H%M%S")
+            customer_id = f"CUST{ts}"
+
+            row = {
+                "CustomerID": customer_id,
+                "Name": name.strip(),
+                "Phone": phone.strip(),
+                "Email": email.strip(),
+                "DateOfJoining": doj.strftime("%Y-%m-%d"),
+                "Shift": shift,
+                "Status": status,
+                "Timestamp": _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+
+            add_customer_row(row)
+            st.success("Customer created successfully!")
+
+            # Redirect back
+            st.switch_page("Manage Customers")
+
+    if cancel_btn:
+        st.switch_page("Manage Customers")
 
 # ----------------------------
 # REFRESH BUTTON
