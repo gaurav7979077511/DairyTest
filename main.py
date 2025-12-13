@@ -1284,33 +1284,39 @@ elif page == "Manage Customers":
 
 elif page == "Milk Bitran":
 
-    st.title("📦 Milk Bitran")
+    st.title("🥛 Milk Bitran")
 
-    # =========================================================
-    # CONFIG
-    # =========================================================
-    CUSTOMER_SHEET_ID = st.secrets.get("sheets", {}).get(
+    # ================= CONFIG =================
+    CUSTOMER_SHEET_ID = st.secrets["sheets"].get(
         "CUSTOMER_SHEET_ID",
         "13n7il7rrEHQ2kek1tIf1W2p0VdepfTkerfu1IeSe8Yc"
     )
-    CUSTOMER_SHEET_TAB = "Sheet1"
 
     MILK_BITRAN_SHEET_ID = "1mXhh57VYHrdGS2c78jGXXzkUQ9LU104OCzpUuV6QDbE"
-    MILK_BITRAN_TAB = "Sheet1"
+    CUSTOMER_TAB = "Sheet1"
+    BITRAN_TAB = "Sheet1"
 
-    # =========================================================
-    # GOOGLE SHEETS HELPERS
-    # =========================================================
+    BITRAN_HEADER = [
+        "Date",
+        "Shift",
+        "CustomerID",
+        "CustomerName",
+        "MilkDelivered",
+        "Timestamp",
+    ]
+
+    # ================= GSheets Helpers =================
     def init_gsheets():
         import gspread
         from oauth2client.service_account import ServiceAccountCredentials
 
-        sa_dict = dict(st.secrets.get("gcp_service_account", {}))
-        scope = [
-            "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive",
-        ]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(sa_dict, scopes=scope)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(
+            dict(st.secrets["gcp_service_account"]),
+            scopes=[
+                "https://spreadsheets.google.com/feeds",
+                "https://www.googleapis.com/auth/drive",
+            ],
+        )
         return gspread.authorize(creds)
 
     def open_sheet(sheet_id, tab):
@@ -1321,172 +1327,160 @@ elif page == "Milk Bitran":
         except Exception:
             return sh.get_worksheet(0)
 
-    # =========================================================
-    # LOAD DATA
-    # =========================================================
+    # ================= Load Customers =================
     def load_customers():
-        ws = open_sheet(CUSTOMER_SHEET_ID, CUSTOMER_SHEET_TAB)
+        ws = open_sheet(CUSTOMER_SHEET_ID, CUSTOMER_TAB)
         rows = ws.get_all_values()
+
         if len(rows) <= 1:
-            return pd.DataFrame()
+            return pd.DataFrame(columns=["CustomerID", "Name", "Shift", "Status"])
+
         df = pd.DataFrame(rows[1:], columns=rows[0])
         return df
 
+    # ================= Load Bitran Data (SAFE) =================
     def load_bitran_data():
-        ws = open_sheet(MILK_BITRAN_SHEET_ID, MILK_BITRAN_TAB)
+        ws = open_sheet(MILK_BITRAN_SHEET_ID, BITRAN_TAB)
         rows = ws.get_all_values()
-        if len(rows) <= 1:
-            return pd.DataFrame(columns=["Date", "Shift", "CustomerID", "CustomerName", "MilkDelivered", "Timestamp"])
+
+        if not rows:
+            ws.insert_row(BITRAN_HEADER, 1)
+            return pd.DataFrame(columns=BITRAN_HEADER)
+
+        if rows[0] != BITRAN_HEADER:
+            ws.insert_row(BITRAN_HEADER, 1)
+            return pd.DataFrame(columns=BITRAN_HEADER)
+
         return pd.DataFrame(rows[1:], columns=rows[0])
 
+    # ================= Insert Rows =================
     def append_bitran_rows(rows):
-        ws = open_sheet(MILK_BITRAN_SHEET_ID, MILK_BITRAN_TAB)
-        ws.append_rows(rows, value_input_option="USER_ENTERED")
+        ws = open_sheet(MILK_BITRAN_SHEET_ID, BITRAN_TAB)
+        for r in rows:
+            ws.append_row(r, value_input_option="USER_ENTERED")
 
-    # =========================================================
-    # SESSION STATE
-    # =========================================================
+    # ================= UI State =================
     if "show_form" not in st.session_state:
-        st.session_state.show_form = False
-    if "current_shift" not in st.session_state:
-        st.session_state.current_shift = None
+        st.session_state.show_form = None
 
-    # =========================================================
-    # ACTION BUTTONS
-    # =========================================================
     col1, col2 = st.columns(2)
 
     with col1:
         if st.button("🌅 Morning Bitran", use_container_width=True):
-            st.session_state.show_form = True
-            st.session_state.current_shift = "Morning"
+            st.session_state.show_form = "Morning"
 
     with col2:
-        if st.button("🌇 Evening Bitran", use_container_width=True):
-            st.session_state.show_form = True
-            st.session_state.current_shift = "Evening"
+        if st.button("🌃 Evening Bitran", use_container_width=True):
+            st.session_state.show_form = "Evening"
 
-    # =========================================================
-    # DAILY SUMMARY CARDS
-    # =========================================================
+    # ================= DAILY SUMMARY CARDS =================
     df_bitran = load_bitran_data()
 
     if not df_bitran.empty:
-        df_bitran["MilkDelivered"] = pd.to_numeric(df_bitran["MilkDelivered"], errors="coerce").fillna(0)
+        df_bitran["MilkDelivered"] = pd.to_numeric(
+            df_bitran["MilkDelivered"], errors="coerce"
+        ).fillna(0)
+
         summary = (
-            df_bitran
-            .groupby(["Date", "Shift"])["MilkDelivered"]
+            df_bitran.groupby(["Date", "Shift"])["MilkDelivered"]
             .sum()
             .reset_index()
             .sort_values("Date", ascending=False)
         )
 
-        st.markdown("### 📊 Daily Milk Summary")
+        st.subheader("📊 Daily Summary")
 
-        cards = st.columns(4)
-        for i, row in summary.iterrows():
-            with cards[i % 4]:
+        cols = st.columns(4)
+        i = 0
+        for _, r in summary.iterrows():
+            with cols[i % 4]:
                 st.markdown(
                     f"""
                     <div style="
-                        background: linear-gradient(135deg,#00c6ff,#0072ff);
                         padding:14px;
                         border-radius:14px;
+                        background:linear-gradient(135deg,#00c6ff,#0072ff);
                         color:white;
                         box-shadow:0 6px 16px rgba(0,0,0,0.25);
-                        margin-bottom:12px;
                     ">
-                        <div style="font-size:13px;">📅 {row['Date']}</div>
-                        <div style="font-size:14px;font-weight:700;">{row['Shift']}</div>
-                        <div style="font-size:18px;font-weight:800;">🥛 {row['MilkDelivered']} L</div>
+                        <div style="font-size:13px;opacity:0.9">{r['Date']}</div>
+                        <div style="font-size:15px;font-weight:700">{r['Shift']}</div>
+                        <div style="font-size:20px;font-weight:800">{r['MilkDelivered']} L</div>
                     </div>
                     """,
-                    unsafe_allow_html=True
+                    unsafe_allow_html=True,
                 )
+            i += 1
 
-    # =========================================================
-    # MILK BITRAN FORM
-    # =========================================================
+    # ================= FORM =================
     if st.session_state.show_form:
 
-        st.markdown("---")
-        st.subheader(f"📝 {st.session_state.current_shift} Milk Bitran")
+        shift = st.session_state.show_form
+        st.divider()
+        st.subheader(f"📝 {shift} Bitran Entry")
 
-        df_customers = load_customers()
+        date = st.date_input("Date")
 
-        if df_customers.empty:
-            st.warning("No customers available.")
+        customers = load_customers()
+        customers = customers[
+            (customers["Status"].str.lower() == "active")
+            & (customers["Shift"].isin([shift, "Both"]))
+        ]
+
+        if customers.empty:
+            st.info("No active customers for this shift.")
         else:
-            df_customers = df_customers[
-                (df_customers["Status"].str.lower() == "active") &
-                (
-                    (df_customers["Shift"].str.lower() == st.session_state.current_shift.lower()) |
-                    (df_customers["Shift"].str.lower() == "both")
-                )
-            ]
-
-            with st.form("milk_bitran_form"):
-
-                date = st.date_input("📅 Date")
-                milk_inputs = {}
-
-                st.markdown("#### 🧾 Milk Distribution (Liters)")
-
-                for _, row in df_customers.iterrows():
-                    key = row["CustomerID"]
-                    milk_inputs[key] = st.number_input(
-                        f"{row['Name']} ({key})",
-                        min_value=0.0,
-                        step=0.5,
-                        key=f"milk_{key}"
+            with st.form("bitran_form"):
+                entries = []
+                for _, c in customers.iterrows():
+                    qty = st.number_input(
+                        f"{c['Name']} ({c['CustomerID']})",
+                        min_value=0.1,
+                        step=0.1,
+                        key=f"{shift}_{c['CustomerID']}",
                     )
+                    entries.append((c, qty))
 
-                col_save, col_cancel = st.columns(2)
-
-                save = col_save.form_submit_button("💾 Save")
-                cancel = col_cancel.form_submit_button("❌ Cancel")
+                save = st.form_submit_button("💾 Save")
+                cancel = st.form_submit_button("❌ Cancel")
 
             if cancel:
-                st.session_state.show_form = False
+                st.session_state.show_form = None
                 st.rerun()
 
             if save:
-                if any(v == 0 for v in milk_inputs.values()):
-                    st.error("Milk value is required for all customers.")
-                else:
-                    df_existing = load_bitran_data()
+                df_existing = load_bitran_data()
 
-                    rows_to_add = []
-                    import datetime as _dt
+                for c, qty in entries:
+                    duplicate = (
+                        (df_existing["Date"] == date.strftime("%Y-%m-%d"))
+                        & (df_existing["Shift"] == shift)
+                        & (df_existing["CustomerID"] == c["CustomerID"])
+                    ).any()
 
-                    for _, cust in df_customers.iterrows():
-                        cid = cust["CustomerID"]
+                    if duplicate:
+                        st.error(
+                            f"Duplicate entry blocked: {c['Name']} ({shift}, {date})"
+                        )
+                        return
 
-                        # Duplicate check
-                        if not df_existing.empty:
-                            dup = df_existing[
-                                (df_existing["Date"] == date.strftime("%Y-%m-%d")) &
-                                (df_existing["Shift"] == st.session_state.current_shift) &
-                                (df_existing["CustomerID"] == cid)
-                            ]
-                            if not dup.empty:
-                                st.error(f"Duplicate entry exists for {cust['Name']}")
-                                st.stop()
+                rows = []
+                ts = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                        rows_to_add.append([
-                            date.strftime("%Y-%m-%d"),
-                            st.session_state.current_shift,
-                            cid,
-                            cust["Name"],
-                            milk_inputs[cid],
-                            _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        ])
+                for c, qty in entries:
+                    rows.append([
+                        date.strftime("%Y-%m-%d"),
+                        shift,
+                        c["CustomerID"],
+                        c["Name"],
+                        qty,
+                        ts,
+                    ])
 
-                    append_bitran_rows(rows_to_add)
-                    st.success("Milk Bitran saved successfully ✅")
-                    st.session_state.show_form = False
-                    st.rerun()
-
+                append_bitran_rows(rows)
+                st.success("Milk Bitran saved successfully ✅")
+                st.session_state.show_form = None
+                st.rerun()
 
 # ----------------------------
 # REFRESH BUTTON
