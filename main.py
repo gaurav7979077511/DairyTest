@@ -1284,6 +1284,10 @@ elif page == "Manage Customers":
 
 elif page == "Milk Bitran":
 
+    import pandas as pd
+    import gspread
+    from oauth2client.service_account import ServiceAccountCredentials
+
     st.title("🥛 Milk Bitran")
 
     # ================= CONFIG =================
@@ -1291,20 +1295,23 @@ elif page == "Milk Bitran":
         "CUSTOMER_SHEET_ID",
         "13n7il7rrEHQ2kek1tIf1W2p0VdepfTkerfu1IeSe8Yc"
     )
+
     MILK_BITRAN_SHEET_ID = "1mXhh57VYHrdGS2c78jGXXzkUQ9LU104OCzpUuV6QDbE"
 
     CUSTOMER_TAB = "Sheet1"
     BITRAN_TAB = "Sheet1"
 
     BITRAN_HEADER = [
-        "Date", "Shift", "CustomerID",
-        "CustomerName", "MilkDelivered", "Timestamp"
+        "Date",
+        "Shift",
+        "CustomerID",
+        "CustomerName",
+        "MilkDelivered",
+        "Timestamp",
     ]
 
     # ================= GSheets =================
     def init_gsheets():
-        import gspread
-        from oauth2client.service_account import ServiceAccountCredentials
         creds = ServiceAccountCredentials.from_json_keyfile_dict(
             dict(st.secrets["gcp_service_account"]),
             scopes=[
@@ -1325,15 +1332,19 @@ elif page == "Milk Bitran":
         ws = open_sheet(CUSTOMER_SHEET_ID, CUSTOMER_TAB)
         rows = ws.get_all_values()
         if len(rows) <= 1:
-            return pd.DataFrame(columns=["CustomerID", "Name", "Shift", "Status"])
+            return pd.DataFrame(
+                columns=["CustomerID", "Name", "Shift", "Status"]
+            )
         return pd.DataFrame(rows[1:], columns=rows[0])
 
     def load_bitran_data():
         ws = open_sheet(MILK_BITRAN_SHEET_ID, BITRAN_TAB)
         rows = ws.get_all_values()
+
         if not rows or rows[0] != BITRAN_HEADER:
             ws.insert_row(BITRAN_HEADER, 1)
             return pd.DataFrame(columns=BITRAN_HEADER)
+
         return pd.DataFrame(rows[1:], columns=rows[0])
 
     def append_bitran_rows(rows):
@@ -1345,103 +1356,92 @@ elif page == "Milk Bitran":
     if "show_form" not in st.session_state:
         st.session_state.show_form = None
 
+    # ================= BUTTONS =================
     col1, col2 = st.columns(2)
+
     with col1:
         if st.button("🌅 Morning Bitran", use_container_width=True):
             st.session_state.show_form = "Morning"
+
     with col2:
         if st.button("🌃 Evening Bitran", use_container_width=True):
             st.session_state.show_form = "Evening"
 
-    # ================= SUMMARY CARDS =================
+    # ================= DAILY SUMMARY =================
+    st.subheader("📊 Daily Summary")
+
     df_bitran = load_bitran_data()
 
-    if not df_bitran.empty:
-        df_bitran["MilkDelivered"] = pd.to_numeric(
-            df_bitran["MilkDelivered"], errors="coerce"
-        ).fillna(0)
-
-        summary = (
-            df_bitran.groupby(["Date", "Shift"])["MilkDelivered"]
-            .sum()
-            .reset_index()
-            .sort_values("Date", ascending=False)
+    if df_bitran.empty:
+        st.info("No Bitran data available.")
+    else:
+        df_bitran["MilkDelivered"] = (
+            pd.to_numeric(df_bitran["MilkDelivered"], errors="coerce")
+            .fillna(0)
+            .round(2)
         )
 
-        st.subheader("📊 Daily Summary")
+        summary_df = (
+            df_bitran
+            .groupby(["Date", "Shift"], as_index=False)["MilkDelivered"]
+            .sum()
+            .sort_values(["Date", "Shift"], ascending=[False, True])
+        )
 
-        if df_bitran.empty:
-            st.info("No Bitran data available.")
-        else:
-            df_bitran["MilkDelivered"] = (
-                pd.to_numeric(df_bitran["MilkDelivered"], errors="coerce")
-                .fillna(0)
-                .round(2)
-            )
-        
-            summary_df = (
-                df_bitran
-                .groupby(["Date", "Shift"], as_index=False)["MilkDelivered"]
-                .sum()
-                .sort_values(["Date", "Shift"], ascending=[False, True])
-            )
-        
-            cards_html = """
-            <style>
-                .summary-container {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 16px;
-                    margin-top: 12px;
-                }
-                .summary-card {
-                    width: 220px;
-                    padding: 14px;
-                    border-radius: 14px;
-                    color: white;
-                    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
-                    font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;
-                }
-                .morning {
-                    background: linear-gradient(135deg,#43cea2,#185a9d);
-                }
-                .evening {
-                    background: linear-gradient(135deg,#7F00FF,#E100FF);
-                }
-                .date {
-                    font-size: 13px;
-                    opacity: 0.9;
-                }
-                .shift {
-                    font-size: 15px;
-                    font-weight: 700;
-                    margin-top: 4px;
-                }
-                .liters {
-                    font-size: 20px;
-                    font-weight: 800;
-                    margin-top: 6px;
-                }
-            </style>
-        
-            <div class="summary-container">
+        cards_html = """
+        <style>
+            .summary-container {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+                margin-top: 12px;
+            }
+            .summary-card {
+                width: 220px;
+                padding: 14px;
+                border-radius: 14px;
+                color: white;
+                box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+                font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;
+            }
+            .morning {
+                background: linear-gradient(135deg,#43cea2,#185a9d);
+            }
+            .evening {
+                background: linear-gradient(135deg,#7F00FF,#E100FF);
+            }
+            .date {
+                font-size: 13px;
+                opacity: 0.9;
+            }
+            .shift {
+                font-size: 15px;
+                font-weight: 700;
+                margin-top: 4px;
+            }
+            .liters {
+                font-size: 20px;
+                font-weight: 800;
+                margin-top: 6px;
+            }
+        </style>
+
+        <div class="summary-container">
+        """
+
+        for _, row in summary_df.iterrows():
+            cls = "morning" if row["Shift"].lower() == "morning" else "evening"
+            cards_html += f"""
+            <div class="summary-card {cls}">
+                <div class="date">{row['Date']}</div>
+                <div class="shift">{row['Shift']}</div>
+                <div class="liters">{row['MilkDelivered']:.2f} L</div>
+            </div>
             """
-        
-            for _, row in summary_df.iterrows():
-                cls = "morning" if row["Shift"].lower() == "morning" else "evening"
-                cards_html += f"""
-                <div class="summary-card {cls}">
-                    <div class="date">{row['Date']}</div>
-                    <div class="shift">{row['Shift']}</div>
-                    <div class="liters">{row['MilkDelivered']:.2f} L</div>
-                </div>
-                """
-        
-            cards_html += "</div>"
-        
-            # 🔥 THIS LINE IS CRITICAL
-            st.markdown(cards_html, unsafe_allow_html=True)
 
+        cards_html += "</div>"
+
+        st.markdown(cards_html, unsafe_allow_html=True)
 
     # ================= ENTRY FORM =================
     if st.session_state.show_form:
@@ -1460,10 +1460,12 @@ elif page == "Milk Bitran":
 
         with st.form("bitran_form"):
             entries = []
+
             for _, c in customers.iterrows():
                 qty = st.text_input(
                     f"{c['Name']} ({c['CustomerID']})",
                     placeholder="Enter milk in liters",
+                    value="",   # ✅ EMPTY FIELD
                     key=f"{shift}_{c['CustomerID']}",
                 )
                 entries.append((c, qty))
@@ -1479,34 +1481,39 @@ elif page == "Milk Bitran":
             date_str = date.strftime("%Y-%m-%d")
             df_existing = load_bitran_data()
 
-            rows, has_error = [], False
+            rows = []
             ts = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
 
             for c, qty in entries:
                 if not qty.strip():
                     st.error(f"Milk value required for {c['Name']}")
-                    has_error = True
-                    break
+                    return
 
-                if (
+                duplicate = (
                     (df_existing["Date"] == date_str)
                     & (df_existing["Shift"] == shift)
                     & (df_existing["CustomerID"] == c["CustomerID"])
-                ).any():
-                    st.error(f"Duplicate entry: {c['Name']}")
-                    has_error = True
-                    break
+                ).any()
+
+                if duplicate:
+                    st.error(
+                        f"Duplicate entry blocked: {c['Name']} ({shift}, {date_str})"
+                    )
+                    return
 
                 rows.append([
-                    date_str, shift, c["CustomerID"],
-                    c["Name"], float(qty), ts
+                    date_str,
+                    shift,
+                    c["CustomerID"],
+                    c["Name"],
+                    float(qty),
+                    ts,
                 ])
 
-            if not has_error:
-                append_bitran_rows(rows)
-                st.success("Milk Bitran saved successfully ✅")
-                st.session_state.show_form = None
-                st.rerun()
+            append_bitran_rows(rows)
+            st.success("Milk Bitran saved successfully ✅")
+            st.session_state.show_form = None
+            st.rerun()
 
 
 # ----------------------------
