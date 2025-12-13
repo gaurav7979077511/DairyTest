@@ -1273,7 +1273,7 @@ elif page == "Manage Customers":
 
     
             with cols[i % 4]:
-                components.html(card_html, height=160)
+                components.html(card_html, height=150)
 
         # ----- Select Customer to Edit -----
         options = df_display.apply(lambda r: f"{r['CustomerID']} | {r['Name']}", axis=1).tolist()
