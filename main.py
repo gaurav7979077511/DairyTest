@@ -1220,10 +1220,10 @@ elif page == "Manage Customers":
     
         cols = st.columns(4)
         for i, row in df_display.iterrows():
-        
+
             shift = str(row["Shift"]).strip()
         
-            # 🎨 Shift-based gradient (Morning / Evening / Both)
+            # 🎨 Shift-based gradient
             if shift == "Morning":
                 gradient = "linear-gradient(135deg,#43cea2,#185a9d)"
             elif shift == "Evening":
@@ -1239,37 +1239,38 @@ elif page == "Manage Customers":
                     <div style="
                         padding:18px;
                         margin:14px 0;
-                        border-radius:16px;
+                        border-radius:18px;
                         background:{gradient};
                         color:white;
-                        box-shadow:0 8px 20px rgba(0,0,0,0.3);
+                        box-shadow:0 8px 20px rgba(0,0,0,0.35);
                     ">
-                        <div style="font-size:18px;font-weight:800;">
+        
+                        <div style="font-size:18px;font-weight:800;margin-bottom:8px;">
                             👤 {row['Name']}
                         </div>
         
-                        <div style="font-size:13px;opacity:0.9;margin-top:6px;">
-                            📞 {row['Phone']}
-                        </div>
-                        <div style="font-size:13px;opacity:0.9;">
-                            ✉️ {row['Email']}
+                        <div style="
+                            background:rgba(0,0,0,0.25);
+                            padding:12px;
+                            border-radius:12px;
+                        ">
+                            <p style="margin:4px 0;font-size:14px;">📞 {row['Phone']}</p>
+                            <p style="margin:4px 0;font-size:14px;">✉️ {row['Email']}</p>
+        
+                            <hr style="border:0;border-top:1px solid rgba(255,255,255,0.3);margin:8px 0;">
+        
+                            <p style="margin:4px 0;font-size:13px;">🆔 <b>{row['CustomerID']}</b></p>
+                            <p style="margin:4px 0;font-size:13px;">📅 Joined: {row['DateOfJoining']}</p>
+                            <p style="margin:4px 0;font-size:13px;font-weight:600;">
+                                ⏰ {row['Shift']} • {row['Status']}
+                            </p>
                         </div>
         
-                        <hr style="border:0;border-top:1px solid rgba(255,255,255,0.35);margin:10px 0;">
-        
-                        <div style="font-size:13px;">
-                            🆔 <b>{row['CustomerID']}</b>
-                        </div>
-                        <div style="font-size:13px;">
-                            📅 Joined: {row['DateOfJoining']}
-                        </div>
-                        <div style="font-size:13px;font-weight:600;">
-                            ⏰ {row['Shift']} • {row['Status']}
-                        </div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
+        
 
 
         # ----- Select Customer to Edit -----
