@@ -1370,9 +1370,11 @@ elif page == "Milk Bitran":
 
         st.subheader("📊 Daily Summary")
 
-        if df_bitran.empty:
-            st.info("No Bitran data available.")
-        else:
+        # ================= SUMMARY CARDS =================
+        df_bitran = load_bitran_data()
+        
+        if not df_bitran.empty:
+        
             df_bitran["MilkDelivered"] = (
                 pd.to_numeric(df_bitran["MilkDelivered"], errors="coerce")
                 .fillna(0)
@@ -1386,61 +1388,76 @@ elif page == "Milk Bitran":
                 .sort_values(["Date", "Shift"], ascending=[False, True])
             )
         
-            cards_html = """
-            <style>
-                .summary-container {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 16px;
-                    margin-top: 12px;
-                }
-                .summary-card {
-                    width: 220px;
-                    padding: 14px;
-                    border-radius: 14px;
-                    color: white;
-                    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
-                    font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;
-                }
-                .morning {
-                    background: linear-gradient(135deg,#43cea2,#185a9d);
-                }
-                .evening {
-                    background: linear-gradient(135deg,#7F00FF,#E100FF);
-                }
-                .date {
-                    font-size: 13px;
-                    opacity: 0.9;
-                }
-                .shift {
-                    font-size: 15px;
-                    font-weight: 700;
-                    margin-top: 4px;
-                }
-                .liters {
-                    font-size: 20px;
-                    font-weight: 800;
-                    margin-top: 6px;
-                }
-            </style>
+            st.subheader("📊 Daily Summary")
         
-            <div class="summary-container">
-            """
+            card_blocks = []
         
             for _, row in summary_df.iterrows():
                 cls = "morning" if row["Shift"].lower() == "morning" else "evening"
-                cards_html += f"""
-                <div class="summary-card {cls}">
-                    <div class="date">{row['Date']}</div>
-                    <div class="shift">{row['Shift']}</div>
-                    <div class="liters">{row['MilkDelivered']:.2f} L</div>
-                </div>
-                """
         
-            cards_html += "</div>"
+                card_blocks.append(
+                    f"""
+                    <div class="summary-card {cls}">
+                        <div class="date">{row['Date']}</div>
+                        <div class="shift">{row['Shift']}</div>
+                        <div class="liters">{row['MilkDelivered']:.2f} L</div>
+                    </div>
+                    """
+                )
         
-            # 🔥 THIS LINE IS CRITICAL
-            st.markdown(cards_html, unsafe_allow_html=True)
+            summary_html = f"""
+        <style>
+        .summary-container {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 12px;
+        }}
+        
+        .summary-card {{
+            width: 220px;
+            padding: 14px;
+            border-radius: 14px;
+            color: white;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+            font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial;
+        }}
+        
+        .summary-card.morning {{
+            background: linear-gradient(135deg,#43cea2,#185a9d);
+        }}
+        
+        .summary-card.evening {{
+            background: linear-gradient(135deg,#7F00FF,#E100FF);
+        }}
+        
+        .date {{
+            font-size: 13px;
+            opacity: 0.9;
+        }}
+        
+        .shift {{
+            font-size: 15px;
+            font-weight: 700;
+            margin-top: 4px;
+        }}
+        
+        .liters {{
+            font-size: 20px;
+            font-weight: 800;
+            margin-top: 6px;
+        }}
+        </style>
+        
+        <div class="summary-container">
+            {''.join(card_blocks)}
+        </div>
+        """
+        
+            st.markdown(summary_html, unsafe_allow_html=True)
+        else:
+            st.info("No Bitran data available.")
+
 
 
     # ================= ENTRY FORM =================
