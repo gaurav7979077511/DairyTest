@@ -990,7 +990,19 @@ elif page == "Investments":
 # ----------------------------
 elif page == "Manage Customers":
 
+    import streamlit as st
+    import pandas as pd
+    import streamlit.components.v1 as components
+    import datetime as dt
+
     st.title("👥 Manage Customers")
+
+    # ---------- STATE ----------
+    if "show_add_form" not in st.session_state:
+        st.session_state.show_add_form = False
+
+    if "edit_customer_id" not in st.session_state:
+        st.session_state.edit_customer_id = None
 
     # ---------- CONFIG ----------
     CUSTOMER_SHEET_ID = st.secrets.get("sheets", {}).get(
@@ -999,345 +1011,185 @@ elif page == "Manage Customers":
     )
     CUSTOMER_SHEET_TAB = "Sheet1"
 
-    # ---------- GOOGLE SHEETS HELPERS ----------
+    # ---------- GOOGLE SHEETS ----------
     def init_gsheets():
-        try:
-            import gspread
-            from oauth2client.service_account import ServiceAccountCredentials
-        except Exception:
-            st.error("Install gspread + oauth2client")
-            raise
-
-        sa_dict = dict(st.secrets.get("gcp_service_account", {}))
-        if not sa_dict:
-            st.error("Service Account JSON missing.")
-            raise RuntimeError("Missing service account JSON")
+        import gspread
+        from oauth2client.service_account import ServiceAccountCredentials
 
         scope = [
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/drive",
         ]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(sa_dict, scopes=scope)
-        client = gspread.authorize(creds)
-        return client
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(
+            dict(st.secrets["gcp_service_account"]),
+            scopes=scope,
+        )
+        return gspread.authorize(creds)
 
     def open_customer_sheet():
         client = init_gsheets()
         sh = client.open_by_key(CUSTOMER_SHEET_ID)
-        try:
-            ws = sh.worksheet(CUSTOMER_SHEET_TAB)
-        except Exception:
-            ws = sh.get_worksheet(0)
-        return ws
+        return sh.worksheet(CUSTOMER_SHEET_TAB)
 
     def get_customers_df():
-        try:
-            ws = open_customer_sheet()
-            all_vals = ws.get_all_values()
+        ws = open_customer_sheet()
+        data = ws.get_all_values()
+        if len(data) <= 1:
+            return pd.DataFrame(columns=[
+                "CustomerID","Name","Phone","Email",
+                "DateOfJoining","Shift","Status","Timestamp"
+            ])
+        return pd.DataFrame(data[1:], columns=data[0])
 
-            if not all_vals or len(all_vals) <= 1:
-                cols = ["CustomerID", "Name", "Phone", "Email",
-                        "DateOfJoining", "Shift", "Status", "Timestamp"]
-                return pd.DataFrame(columns=cols)
+    def update_customer_by_id(customer_id, updated):
+        ws = open_customer_sheet()
+        rows = ws.get_all_values()
+        header = rows[0]
 
-            df = pd.DataFrame(all_vals[1:], columns=all_vals[0])
-            df.columns = [c.strip() for c in df.columns]
-            return df
+        id_col = header.index("CustomerID")
+        for i, r in enumerate(rows[1:], start=2):
+            if r[id_col] == customer_id:
+                for k, v in updated.items():
+                    ws.update_cell(i, header.index(k) + 1, v)
+                return True
+        return False
 
-        except Exception as e:
-            st.error(f"Failed to read customer sheet: {e}")
-            return pd.DataFrame()
-
-    def ensure_header(ws):
-        header = ws.row_values(1)
-        if not header:
-            header = ["CustomerID", "Name", "Phone", "Email",
-                      "DateOfJoining", "Shift", "Status", "Timestamp"]
-            ws.insert_row(header, 1)
-        return header
-
-    def add_customer_row(row_dict):
-        try:
-            ws = open_customer_sheet()
-            header = ensure_header(ws)
-            row = [row_dict.get(h, "") for h in header]
-            ws.append_row(row, value_input_option="USER_ENTERED")
-            return True
-        except Exception as e:
-            st.error(f"Failed to add customer: {e}")
-            return False
-
-    def find_row_number_by_customerid(ws, customer_id):
-        all_vals = ws.get_all_values()
-        if not all_vals or len(all_vals) < 2:
-            return None, None
-
-        header = all_vals[0]
-        cust_idx = None
-        for idx, col in enumerate(header):
-            if col.strip().lower() == "customerid":
-                cust_idx = idx
-                break
-
-        if cust_idx is None:
-            return None, header
-
-        row_num = None
-        for r_idx, row in enumerate(all_vals[1:], start=2):
-            if str(row[cust_idx]).strip() == str(customer_id).strip():
-                row_num = r_idx
-                break
-
-        return row_num, header
-
-    def update_customer_by_id(customer_id, updated_dict):
-        try:
-            ws = open_customer_sheet()
-            row_num, header = find_row_number_by_customerid(ws, customer_id)
-            if row_num is None:
-                st.error("CustomerID not found.")
-                return False
-
-            for col_idx, col_name in enumerate(header, start=1):
-                if col_name in updated_dict:
-                    ws.update_cell(row_num, col_idx, updated_dict[col_name])
-            return True
-
-        except Exception as e:
-            st.error(f"Failed to update customer: {e}")
-            return False
-
-    def delete_customer_by_id(customer_id):
-        try:
-            ws = open_customer_sheet()
-            row_num, header = find_row_number_by_customerid(ws, customer_id)
-            if row_num is None:
-                st.error("CustomerID not found.")
-                return False
-
-            status_idx = None
-            for idx, col in enumerate(header, start=1):
-                if col.strip().lower() == "status":
-                    status_idx = idx
-                    break
-
-            ws.update_cell(row_num, status_idx, "Inactive")
-            return True
-
-        except Exception as e:
-            st.error(f"Failed to mark inactive: {e}")
-            return False
-
-    # ---------------------------
-    # STATE for showing/hiding form
-    # ---------------------------
-    if "show_add_form" not in st.session_state:
-        st.session_state.show_add_form = False
-
-    def show_form():
+    # ---------- ADD CUSTOMER ----------
+    st.markdown("### ➕ Add Customer")
+    if st.button("Create Customer Profile"):
         st.session_state.show_add_form = True
 
-    def hide_form():
-        st.session_state.show_add_form = False
-
-    # ---------- BUTTON TO SHOW FORM ----------
-    st.markdown("### ➕ Add Customer")
-    st.button("Create Customer Profile", on_click=show_form)
-
-    # ---------- FORM SECTION (HIDDEN INITIALLY) ----------
     if st.session_state.show_add_form:
-
-        st.info("Fill the details below to add a new customer.")
-
-        with st.form("create_customer_popup", clear_on_submit=False):
-
-            c1, c2, c3 = st.columns([3, 3, 2])
+        with st.form("add_customer"):
+            c1, c2, c3 = st.columns(3)
 
             with c1:
-                name = st.text_input("Customer Name")
-                phone = st.text_input("Phone Number")
+                name = st.text_input("Name")
+                phone = st.text_input("Phone")
 
             with c2:
                 email = st.text_input("Email")
                 doj = st.date_input("Date of Joining")
 
             with c3:
-                shift = st.selectbox("Shift", ["Morning", "Evening", "Both"])
-                status = st.selectbox("Status", ["Active", "Inactive"])
+                shift = st.selectbox("Shift", ["Morning","Evening","Both"])
+                status = st.selectbox("Status", ["Active","Inactive"])
 
-            colA, colB = st.columns(2)
-            create_btn = colA.form_submit_button("Create Customer")
-            cancel_btn = colB.form_submit_button("Cancel")
+            a, b = st.columns(2)
+            create = a.form_submit_button("Create")
+            cancel = b.form_submit_button("Cancel")
 
-        if cancel_btn:
-            hide_form()
+        if cancel:
+            st.session_state.show_add_form = False
             st.rerun()
 
-        if create_btn:
-            if not name.strip():
-                st.error("Customer Name is required.")
-            else:
-                import datetime as _dt
-                ts = _dt.datetime.now().strftime("%Y%m%d%H%M%S")
-                customer_id = f"CUST{ts}"
-
-                row = {
-                    "CustomerID": customer_id,
-                    "Name": name.strip(),
-                    "Phone": phone.strip(),
-                    "Email": email.strip(),
-                    "DateOfJoining": doj.strftime("%Y-%m-%d"),
-                    "Shift": shift,
-                    "Status": status,
-                    "Timestamp": _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                }
-
-                ok = add_customer_row(row)
-                if ok:
-                    st.success(f"Customer created: {customer_id}")
-                    hide_form()
-                    st.rerun()
-                else:
-                    st.error("Failed to add customer.")
+        if create:
+            cid = f"CUST{dt.datetime.now().strftime('%Y%m%d%H%M%S')}"
+            ws = open_customer_sheet()
+            ws.append_row([
+                cid, name, phone, email,
+                doj.strftime("%Y-%m-%d"),
+                shift, status,
+                dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ])
+            st.success("Customer added")
+            st.session_state.show_add_form = False
+            st.rerun()
 
     # ---------- CUSTOMER CARDS ----------
     st.markdown("### 📋 Customers List")
-    
-    df_customers = get_customers_df()
-    
-    if df_customers.empty:
-        st.info("No customers found.")
-    else:
-        expected_cols = [
-            "CustomerID", "Name", "Phone", "Email",
-            "DateOfJoining", "Shift", "Status"
-        ]
-    
-        for col in expected_cols:
-            if col not in df_customers.columns:
-                df_customers[col] = ""
-    
-        df_display = df_customers[expected_cols]
-    
-        for i, row in df_display.iterrows():
-    
-            if i % 4 == 0:
-                cols = st.columns(4)
-    
-            shift = str(row["Shift"]).strip()
-    
-            if shift == "Morning":
-                gradient = "linear-gradient(135deg,#43cea2,#185a9d)"
-            elif shift == "Evening":
-                gradient = "linear-gradient(135deg,#7F00FF,#E100FF)"
-            elif shift == "Both":
-                gradient = "linear-gradient(135deg,#f7971e,#ffd200)"
-            else:
-                gradient = "linear-gradient(135deg,#757f9a,#d7dde8)"
-    
-            card_html = f"""
-                <div style="
-                    padding:12px;
-                    border-radius:14px;
-                    background:{gradient};
-                    color:white;
-                    box-shadow:0 6px 16px rgba(0,0,0,0.25);
-                    font-family:inherit;
-                    line-height:1.3;
-                ">
-                    <div style="font-size:15px;font-weight:800;margin-bottom:4px;">
-                        👤 {row['Name']}
-                    </div>
-                
-                    <div style="font-size:12px;opacity:0.9;">
-                        📞 {row['Phone']}
-                    </div>
-                
-                    <div style="font-size:12px;opacity:0.9;">
-                        ✉️ {row['Email']}
-                    </div>
-                
-                    <div style="font-size:12px;margin-top:6px;">
-                        🆔 {row['CustomerID']}
-                    </div>
-                
-                    <div style="font-size:12px;">
-                        📅 {row['DateOfJoining']}
-                    </div>
-                
-                    <div style="font-size:13px;font-weight:700;margin-top:6px;">
-                        ⏰ {row['Shift']} • {row['Status']}
-                    </div>
-                </div>
-                """
+    df = get_customers_df()
 
-    
-            with cols[i % 4]:
-                components.html(card_html, height=150)
+    for i, row in df.iterrows():
 
-        # ----- Select Customer to Edit -----
-        options = df_display.apply(lambda r: f"{r['CustomerID']} | {r['Name']}", axis=1).tolist()
-        selected = st.selectbox("Select Customer to Edit", [""] + options)
+        if i % 4 == 0:
+            cols = st.columns(4)
 
-        if selected:
-            sel_id = selected.split("|")[0].strip()
-            cust_row = df_display[df_display["CustomerID"] == sel_id].iloc[0]
+        shift = row["Shift"]
+        gradient = {
+            "Morning": "linear-gradient(135deg,#43cea2,#185a9d)",
+            "Evening": "linear-gradient(135deg,#7F00FF,#E100FF)",
+            "Both": "linear-gradient(135deg,#f7971e,#ffd200)"
+        }.get(shift, "linear-gradient(135deg,#757f9a,#d7dde8)")
 
-            st.markdown("### ✏️ Edit Customer")
+        card_html = f"""
+        <div style="
+            position:relative;
+            padding:12px;
+            border-radius:14px;
+            background:{gradient};
+            color:white;
+            box-shadow:0 6px 16px rgba(0,0,0,0.25);
+            line-height:1.3;
+        ">
 
-            with st.form("edit_customer_form", clear_on_submit=False):
+            <div style="font-size:15px;font-weight:800;">👤 {row['Name']}</div>
+            <div style="font-size:12px;">📞 {row['Phone']}</div>
+            <div style="font-size:12px;">✉️ {row['Email']}</div>
+            <div style="font-size:12px;">🆔 {row['CustomerID']}</div>
+            <div style="font-size:12px;">📅 {row['DateOfJoining']}</div>
+            <div style="font-size:13px;font-weight:700;">
+                ⏰ {row['Shift']} • {row['Status']}
+            </div>
+        </div>
+        """
 
-                e1, e2, e3 = st.columns([3, 3, 2])
+        with cols[i % 4]:
+            components.html(card_html, height=150)
 
-                with e1:
-                    e_name = st.text_input("Customer Name", value=cust_row["Name"])
-                    e_phone = st.text_input("Phone Number", value=cust_row["Phone"])
+            if st.button("✏️", key=f"edit_{row['CustomerID']}"):
+                st.session_state.edit_customer_id = row["CustomerID"]
+                st.rerun()
 
-                with e2:
-                    e_email = st.text_input("Email", value=cust_row["Email"])
-                    try:
-                        import datetime as _dt
-                        parsed = _dt.datetime.strptime(cust_row["DateOfJoining"], "%Y-%m-%d").date()
-                    except Exception:
-                        parsed = pd.to_datetime(cust_row["DateOfJoining"], errors="coerce")
-                        parsed = parsed.date() if not pd.isna(parsed) else pd.Timestamp.today().date()
-                    e_doj = st.date_input("Date Of Joining", value=parsed)
+            # ---------- INLINE EDIT FORM ----------
+            if st.session_state.edit_customer_id == row["CustomerID"]:
+                with st.form(f"edit_{row['CustomerID']}"):
 
-                with e3:
-                    e_shift = st.selectbox("Shift", ["Morning", "Evening", "Both"],
-                                           index=["Morning", "Evening", "Both"].index(cust_row["Shift"])
-                                           if cust_row["Shift"] in ["Morning", "Evening", "Both"] else 0)
-                    e_status = st.selectbox("Status", ["Active", "Inactive"],
-                                            index=0 if cust_row["Status"] != "Inactive" else 1)
+                    e1, e2, e3 = st.columns(3)
+                    with e1:
+                        e_name = st.text_input("Name", row["Name"])
+                        e_phone = st.text_input("Phone", row["Phone"])
+                    with e2:
+                        e_email = st.text_input("Email", row["Email"])
+                        e_doj = st.date_input(
+                            "DOJ",
+                            pd.to_datetime(row["DateOfJoining"]).date()
+                        )
+                    with e3:
+                        e_shift = st.selectbox(
+                            "Shift",
+                            ["Morning","Evening","Both"],
+                            index=["Morning","Evening","Both"].index(row["Shift"])
+                        )
+                        e_status = st.selectbox(
+                            "Status",
+                            ["Active","Inactive"],
+                            index=0 if row["Status"] == "Active" else 1
+                        )
 
-                colU, colD = st.columns(2)
-                update_btn = colU.form_submit_button("Save Changes")
-                del_btn = colD.form_submit_button("Mark Inactive")
+                    u, c = st.columns(2)
+                    update = u.form_submit_button("Update")
+                    cancel = c.form_submit_button("Cancel")
 
-            if update_btn:
-                updated = {
-                    "Name": e_name.strip(),
-                    "Phone": e_phone.strip(),
-                    "Email": e_email.strip(),
-                    "DateOfJoining": e_doj.strftime("%Y-%m-%d"),
-                    "Shift": e_shift,
-                    "Status": e_status,
-                }
-
-                if update_customer_by_id(sel_id, updated):
-                    st.success("Customer updated successfully")
+                if cancel:
+                    st.session_state.edit_customer_id = None
                     st.rerun()
-                else:
-                    st.error("Failed to update")
 
-            if del_btn:
-                if delete_customer_by_id(sel_id):
-                    st.success("Customer marked inactive")
+                if update:
+                    update_customer_by_id(
+                        row["CustomerID"],
+                        {
+                            "Name": e_name,
+                            "Phone": e_phone,
+                            "Email": e_email,
+                            "DateOfJoining": e_doj.strftime("%Y-%m-%d"),
+                            "Shift": e_shift,
+                            "Status": e_status,
+                        }
+                    )
+                    st.success("Customer updated")
+                    st.session_state.edit_customer_id = None
                     st.rerun()
-                else:
-                    st.error("Could not update status")
-
-    st.info("Ensure Google Sheet access is granted to the service account.")
 
 elif page == "Milk Bitran":
 
